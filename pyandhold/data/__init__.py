@@ -1,4 +1,4 @@
-"""Data module for portfolio optimizer."""
+"""Data module for PyAndHold."""
 
 from .downloader import DataDownloader
 from .preprocessor import DataPreprocessor

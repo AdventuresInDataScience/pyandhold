@@ -1,1 +1,1 @@
-"""Test suite for portfolio optimizer."""
+"""Test suite for PyAndHold."""

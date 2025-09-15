@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from portfolio_optimizer.data import DataDownloader, DataPreprocessor, StockUniverse
+from pyandhold.data import DataDownloader, DataPreprocessor, StockUniverse
 
 
 class TestDataDownloader:

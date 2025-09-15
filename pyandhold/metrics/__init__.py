@@ -1,4 +1,4 @@
-"""Metrics module for portfolio optimizer."""
+"""Metrics module for PyAndHold."""
 
 from .returns import ReturnMetrics
 from .risk import RiskMetrics

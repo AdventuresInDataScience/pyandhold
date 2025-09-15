@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from portfolio_optimizer.optimization import PortfolioOptimizer, RobustOptimizer, ConstraintBuilder
+from pyandhold.optimization import PortfolioOptimizer, RobustOptimizer, ConstraintBuilder
 
 
 class TestPortfolioOptimizer:

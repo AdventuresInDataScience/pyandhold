@@ -1,4 +1,4 @@
-"""Streamlit dashboard for portfolio optimization."""
+"""Streamlit dashboard for PyAndHold portfolio optimization."""
 
 import streamlit as st
 import pandas as pd
@@ -26,12 +26,12 @@ class PortfolioDashboard:
     def setup_page(self):
         """Configure Streamlit page."""
         st.set_page_config(
-            page_title="Portfolio Optimizer",
+            page_title="PyAndHold",
             page_icon="📈",
             layout="wide"
         )
         
-        st.title("📈 Portfolio Optimizer & Visualizer")
+        st.title("📈 PyAndHold Portfolio Analyzer")
         st.markdown("---")
     
     def run(self):

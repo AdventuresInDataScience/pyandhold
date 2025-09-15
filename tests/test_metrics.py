@@ -3,7 +3,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from portfolio_optimizer.metrics import ReturnMetrics, RiskMetrics, PerformanceMetrics
+from pyandhold.metrics import ReturnMetrics, RiskMetrics, PerformanceMetrics
 
 
 class TestReturnMetrics:

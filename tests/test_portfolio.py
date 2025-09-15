@@ -4,8 +4,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from portfolio_optimizer.portfolio.portfolio import Portfolio
-from portfolio_optimizer.data.downloader import DataDownloader
+from pyandhold.portfolio.portfolio import Portfolio
+from pyandhold.data.downloader import DataDownloader
 
 
 class TestPortfolio:

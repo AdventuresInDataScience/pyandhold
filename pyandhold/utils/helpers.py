@@ -1,4 +1,4 @@
-"""Utility functions for portfolio optimization."""
+"""Utility functions for PyAndHold portfolio optimization."""
 
 import pandas as pd
 import numpy as np

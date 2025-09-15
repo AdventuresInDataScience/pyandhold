@@ -1,4 +1,4 @@
-"""Portfolio Optimizer: A comprehensive library for portfolio analysis and optimization."""
+"""PyAndHold: A comprehensive library for portfolio analysis and optimization."""
 
 from .portfolio.portfolio import Portfolio
 from .data.downloader import DataDownloader

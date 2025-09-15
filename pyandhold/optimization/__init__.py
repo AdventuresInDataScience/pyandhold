@@ -1,4 +1,4 @@
-"""Optimization module for portfolio optimizer."""
+"""Optimization module for PyAndHold."""
 
 from .optimizers import PortfolioOptimizer
 from .constraints import ConstraintBuilder

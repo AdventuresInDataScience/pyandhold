@@ -1,4 +1,4 @@
-"""Portfolio module for portfolio optimizer."""
+"""Portfolio module for PyAndHold."""
 
 from .portfolio import Portfolio
 from .backtester import Backtester

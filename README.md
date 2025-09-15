@@ -1,15 +1,15 @@
-# Portfolio Optimizer
+# PyAndHold
 
 A comprehensive Python library for portfolio optimization and analysis with advanced features including robust optimization, backtesting, and interactive visualization.
 
 ## 📁 Repository Structure
 
 ```
-portfolio_optimizer/
+pyandhold/
 ├── setup.py                    # Package setup and dependencies
 ├── requirements.txt            # Python dependencies
 ├── README.md                   # This file
-├── portfolio_optimizer/        # Main package
+├── pyandhold/                  # Main package
 │   ├── __init__.py
 │   ├── data/                   # Data acquisition and preprocessing
 │   │   ├── downloader.py      # Yahoo Finance data downloader
@@ -89,17 +89,15 @@ Historical Data → Preprocessing → Returns Calculation
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/portfolio_optimizer.git
-cd portfolio_optimizer
-
-# Install dependencies
-pip install -r requirements.txt
+git clone https://github.com/yourusername/pyandhold.git
+cd pyandhold
 
 # Install package
-python setup.py install
-
-# Or for development
 pip install -e .
+
+# Or install dependencies manually first
+pip install -r requirements.txt
+python setup.py install
 ```
 
 ## 📚 Examples
@@ -107,7 +105,7 @@ pip install -e .
 ### Example 1: Basic Portfolio Analysis
 
 ```python
-from portfolio_optimizer import Portfolio
+from pyandhold import Portfolio
 
 # Define portfolio weights
 weights = {
@@ -139,7 +137,7 @@ print(f"Sortino Ratio: {metrics['sortino_ratio']:.3f}")
 ### Example 2: Portfolio Optimization
 
 ```python
-from portfolio_optimizer import DataDownloader, PortfolioOptimizer
+from pyandhold import DataDownloader, PortfolioOptimizer
 
 # Download data
 downloader = DataDownloader()
@@ -182,7 +180,7 @@ for ticker, weight in weights_sharpe.items():
 ### Example 3: Robust Optimization with Cross-Validation
 
 ```python
-from portfolio_optimizer import DataDownloader, RobustOptimizer
+from pyandhold import DataDownloader, RobustOptimizer
 
 # Download data
 downloader = DataDownloader()
@@ -218,7 +216,7 @@ shrinkage_weights = robust_opt.shrinkage_covariance_optimize(
 ### Example 4: Advanced Backtesting
 
 ```python
-from portfolio_optimizer import DataDownloader, Backtester
+from pyandhold import DataDownloader, Backtester
 
 # Download data
 downloader = DataDownloader()
@@ -282,7 +280,7 @@ dynamic_results = backtester.backtest_dynamic_strategy(
 ### Example 5: Using Pre-defined Universes
 
 ```python
-from portfolio_optimizer import StockUniverse, Portfolio, PortfolioOptimizer
+from pyandhold import StockUniverse, Portfolio, PortfolioOptimizer
 
 # Get sector ETFs
 sector_etfs = StockUniverse.get_sector_etfs()
@@ -313,7 +311,7 @@ metrics = portfolio.calculate_metrics()
 ### Example 6: Monte Carlo Simulation
 
 ```python
-from portfolio_optimizer import DataDownloader, PortfolioHelpers
+from pyandhold import DataDownloader, PortfolioHelpers
 
 # Download data
 downloader = DataDownloader()
@@ -341,8 +339,8 @@ print(f"95th percentile: {simulation_results['percentile_95'].iloc[-1] - 1:.2%}"
 ### Example 7: Efficient Frontier Visualization
 
 ```python
-from portfolio_optimizer import DataDownloader, PortfolioOptimizer
-from portfolio_optimizer.visualization import PortfolioVisualizer
+from pyandhold import DataDownloader, PortfolioOptimizer
+from pyandhold.visualization import PortfolioVisualizer
 
 # Download data
 downloader = DataDownloader()
@@ -369,7 +367,7 @@ fig.show()
 Launch the Streamlit dashboard for a full GUI experience:
 
 ```bash
-streamlit run portfolio_optimizer/visualization/dashboard.py
+streamlit run pyandhold/visualization/dashboard.py
 ```
 
 Features:
@@ -391,7 +389,7 @@ pytest tests/ -v
 pytest tests/test_optimization.py -v
 
 # Run with coverage
-pytest tests/ --cov=portfolio_optimizer --cov-report=html
+pytest tests/ --cov=pyandhold --cov-report=html
 ```
 
 ## 📊 Available Metrics
@@ -427,7 +425,7 @@ pytest tests/ --cov=portfolio_optimizer --cov-report=html
 ### Custom Constraints
 
 ```python
-from portfolio_optimizer import PortfolioOptimizer, ConstraintBuilder
+from pyandhold import PortfolioOptimizer, ConstraintBuilder
 
 # Sector constraints
 sector_mapping = {
