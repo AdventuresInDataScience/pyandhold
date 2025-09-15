@@ -70,7 +70,14 @@ class DataDownloader:
         
         # Handle single ticker case
         if len(tickers) == 1:
-            prices = data['Close'].to_frame(columns=[tickers[0]])
+            # For single ticker, check if data['Close'] is Series or DataFrame
+            close_data = data['Close']
+            if isinstance(close_data, pd.Series):
+                prices = close_data.to_frame(tickers[0])
+            else:
+                # Already a DataFrame, just rename the column
+                prices = close_data.copy()
+                prices.columns = [tickers[0]]
         else:
             prices = data['Close']
         

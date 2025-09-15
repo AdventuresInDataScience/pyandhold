@@ -6,12 +6,12 @@ import numpy as np
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from typing import Dict, List, Optional
-from ..portfolio.portfolio import Portfolio
-from ..data.downloader import DataDownloader
-from ..data.universe import StockUniverse
-from ..optimization.optimizers import PortfolioOptimizer
-from ..optimization.robust import RobustOptimizer
-from .plots import PortfolioVisualizer
+from pyandhold.portfolio.portfolio import Portfolio
+from pyandhold.data.downloader import DataDownloader
+from pyandhold.data.universe import StockUniverse
+from pyandhold.optimization.optimizers import PortfolioOptimizer
+from pyandhold.optimization.robust import RobustOptimizer
+from pyandhold.visualization.plots import PortfolioVisualizer
 
 
 class PortfolioDashboard:

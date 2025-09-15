@@ -140,62 +140,66 @@ class Portfolio:
         if self.portfolio_value is None:
             self.calculate_portfolio_value()
         
+        # Convert Series to DataFrame for metrics functions
+        portfolio_returns_df = self.portfolio_returns.to_frame('portfolio')
+        portfolio_value_df = self.portfolio_value.to_frame('portfolio')
+        
         # Return metrics
         self.metrics['total_return'] = (self.portfolio_value.iloc[-1] / self.initial_capital) - 1
-        self.metrics['cagr'] = ReturnMetrics.cagr(self.portfolio_value.to_frame()).iloc[0]
+        self.metrics['cagr'] = ReturnMetrics.cagr(portfolio_value_df).iloc[0]
         self.metrics['annualized_return'] = ReturnMetrics.annualized_return(
-            self.portfolio_returns.to_frame()
+            portfolio_returns_df
         ).iloc[0]
         
         # Risk metrics
         self.metrics['volatility'] = RiskMetrics.volatility(
-            self.portfolio_returns.to_frame()
+            portfolio_returns_df
         ).iloc[0]
         self.metrics['max_drawdown'] = RiskMetrics.max_drawdown(
-            self.portfolio_value.to_frame()
+            portfolio_value_df
         ).iloc[0]
         self.metrics['ulcer_index'] = RiskMetrics.ulcer_index(
-            self.portfolio_value.to_frame()
+            portfolio_value_df
         ).iloc[0]
         self.metrics['var_95'] = RiskMetrics.value_at_risk(
-            self.portfolio_returns.to_frame(), 0.95
+            portfolio_returns_df, 0.95
         ).iloc[0]
         self.metrics['cvar_95'] = RiskMetrics.conditional_value_at_risk(
-            self.portfolio_returns.to_frame(), 0.95
+            portfolio_returns_df, 0.95
         ).iloc[0]
         
         # Performance metrics
         self.metrics['sharpe_ratio'] = PerformanceMetrics.sharpe_ratio(
-            self.portfolio_returns.to_frame()
+            portfolio_returns_df
         ).iloc[0]
         self.metrics['sortino_ratio'] = PerformanceMetrics.sortino_ratio(
-            self.portfolio_returns.to_frame()
+            portfolio_returns_df
         ).iloc[0]
         self.metrics['calmar_ratio'] = PerformanceMetrics.calmar_ratio(
-            self.portfolio_value.to_frame()
+            portfolio_value_df
         ).iloc[0]
         self.metrics['omega_ratio'] = PerformanceMetrics.omega_ratio(
-            self.portfolio_returns.to_frame()
+            portfolio_returns_df
         ).iloc[0]
         
         # Benchmark-relative metrics
         if self.benchmark_returns is not None:
             aligned_benchmark = self.benchmark_returns.reindex(self.portfolio_returns.index)
             self.metrics['treynor_ratio'] = PerformanceMetrics.treynor_ratio(
-                self.portfolio_returns.to_frame(),
+                portfolio_returns_df,
                 aligned_benchmark
             ).iloc[0]
             self.metrics['jensens_alpha'] = PerformanceMetrics.jensens_alpha(
-                self.portfolio_returns.to_frame(),
+                portfolio_returns_df,
                 aligned_benchmark
             ).iloc[0]
             self.metrics['information_ratio'] = PerformanceMetrics.information_ratio(
-                self.portfolio_returns.to_frame(),
+                portfolio_returns_df,
                 aligned_benchmark
             ).iloc[0]
         
         self.metrics['k_ratio'] = PerformanceMetrics.k_ratio(
-            self.portfolio_value.to_frame()
+            portfolio_value_df
         ).iloc[0]
         
         return self.metrics
