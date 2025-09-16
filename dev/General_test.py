@@ -2,7 +2,7 @@
 
 ### Example 1: Basic Portfolio Analysis
 
-```python
+#%%
 from pyandhold import Portfolio
 
 # Define portfolio weights
@@ -30,18 +30,16 @@ print(f"Annual Return (CAGR): {metrics['cagr']:.2%}")
 print(f"Sharpe Ratio: {metrics['sharpe_ratio']:.3f}")
 print(f"Max Drawdown: {metrics['max_drawdown']:.2%}")
 print(f"Sortino Ratio: {metrics['sortino_ratio']:.3f}")
-```
 
-### Example 2: Portfolio Optimization
+#%% ### Example 2: Portfolio Optimization
 
-```python
 from pyandhold import DataDownloader, PortfolioOptimizer
 
 # Download data
 downloader = DataDownloader()
 prices = downloader.download_data(
     ['SPY', 'TLT', 'GLD', 'VNQ', 'DBC'],  # Stocks, Bonds, Gold, REITs, Commodities
-    start_date='2019-01-01',
+    start_date='2000-01-01',
     end_date='2023-12-31'
 )
 
@@ -73,9 +71,9 @@ weights_maxret = optimizer.optimize_max_return(
 print("Optimal Weights (Max Sharpe):")
 for ticker, weight in weights_sharpe.items():
     print(f"  {ticker}: {weight:.1%}")
-```
 
-### Example 3: Robust Optimization with Cross-Validation
+
+#%% ### Example 3: Robust Optimization with Cross-Validation
 
 ```python
 from pyandhold import DataDownloader, RobustOptimizer

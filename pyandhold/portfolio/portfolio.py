@@ -216,11 +216,13 @@ class Portfolio:
         metrics: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """
-        Calculate rolling metrics.
+        Calculate rolling metrics for various performance measures.
         
         Args:
-            window: Rolling window size
-            metrics: List of metrics to calculate
+            window: Rolling window size in days
+            metrics: List of metrics to calculate. Available options:
+                    'sharpe_ratio', 'volatility', 'returns', 'sortino_ratio',
+                    'calmar_ratio', 'max_drawdown', 'var_95', 'beta'
             
         Returns:
             DataFrame with rolling metrics
@@ -235,12 +237,36 @@ class Portfolio:
         
         for metric in metrics:
             if metric == 'sharpe_ratio':
-                rolling_data[metric] = self.portfolio_returns.rolling(window).apply(
-                    lambda x: PerformanceMetrics.sharpe_ratio(pd.DataFrame(x))
+                rolling_data['Rolling Sharpe'] = self.portfolio_returns.rolling(window).apply(
+                    lambda x: PerformanceMetrics.sharpe_ratio(pd.DataFrame(x, columns=['returns'])).iloc[0]
+                    if len(x) > 5 else np.nan
                 )
             elif metric == 'volatility':
-                rolling_data[metric] = self.portfolio_returns.rolling(window).std() * np.sqrt(252)
+                rolling_data['Rolling Volatility'] = self.portfolio_returns.rolling(window).std() * np.sqrt(252)
             elif metric == 'returns':
-                rolling_data[metric] = self.portfolio_returns.rolling(window).mean() * 252
+                rolling_data['Rolling Return'] = self.portfolio_returns.rolling(window).mean() * 252
+            elif metric == 'sortino_ratio':
+                rolling_data['Rolling Sortino'] = self.portfolio_returns.rolling(window).apply(
+                    lambda x: PerformanceMetrics.sortino_ratio(pd.DataFrame(x, columns=['returns'])).iloc[0]
+                    if len(x) > 5 else np.nan
+                )
+            elif metric == 'calmar_ratio':
+                # Fix: calmar_ratio needs cumulative values, not returns
+                rolling_data['Rolling Calmar'] = self.portfolio_returns.rolling(window).apply(
+                    lambda x: PerformanceMetrics.calmar_ratio(
+                        pd.DataFrame((1 + x).cumprod(), columns=['values'])
+                    ).iloc[0] if len(x) > 5 else np.nan
+                )
+            elif metric == 'max_drawdown':
+                # Fix: max_drawdown needs cumulative values, not returns
+                rolling_data['Rolling Max DD'] = self.portfolio_returns.rolling(window).apply(
+                    lambda x: RiskMetrics.max_drawdown(
+                        pd.DataFrame((1 + x).cumprod(), columns=['values'])
+                    ).iloc[0] if len(x) > 5 else np.nan
+                )
+            elif metric == 'var_95':
+                rolling_data['Rolling VaR 95%'] = self.portfolio_returns.rolling(window).apply(
+                    lambda x: x.quantile(0.05) if len(x) > 5 else np.nan
+                )
         
         return rolling_data.dropna()
