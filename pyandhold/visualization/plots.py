@@ -765,3 +765,171 @@ class PortfolioVisualizer:
         )
         
         return fig
+    
+    @staticmethod
+    def plot_multiple_portfolios_comparison(
+        portfolio_values: Dict[str, pd.Series],
+        chart_type: str = "performance",
+        title: str = "Portfolio Comparison"
+    ) -> go.Figure:
+        """
+        Plot multiple portfolios comparison with date slider.
+        
+        Args:
+            portfolio_values: Dictionary of portfolio names to value series
+            chart_type: Type of chart ("performance", "returns", "drawdown")
+            title: Plot title
+            
+        Returns:
+            Plotly figure
+        """
+        fig = go.Figure()
+        
+        # Color palette for different portfolios
+        colors = ['blue', 'red', 'green', 'purple', 'orange', 'brown', 'pink', 'gray']
+        
+        for i, (name, values) in enumerate(portfolio_values.items()):
+            if values is None or len(values) == 0:
+                print(f"Warning: {name} has no data to plot")
+                continue
+                
+            if chart_type == "performance":
+                y_data = values.values
+                y_label = "Portfolio Value ($)"
+            elif chart_type == "returns":
+                # Calculate cumulative returns
+                cum_returns = (values / values.iloc[0] - 1) * 100
+                y_data = cum_returns.values
+                y_label = "Cumulative Return (%)"
+            elif chart_type == "drawdown":
+                # Calculate drawdown
+                cumulative = values / values.iloc[0]
+                running_max = cumulative.cummax()
+                drawdown = ((cumulative - running_max) / running_max) * 100
+                y_data = drawdown.values
+                y_label = "Drawdown (%)"
+            else:
+                y_data = values.values
+                y_label = "Value"
+            
+            fig.add_trace(go.Scatter(
+                x=values.index,
+                y=y_data,
+                mode='lines',
+                name=name,
+                line=dict(color=colors[i % len(colors)], width=2)
+            ))
+        
+        # Add date slider and range selector
+        fig.update_layout(
+            title=title,
+            xaxis_title="Date",
+            yaxis_title=y_label,
+            hovermode='x unified',
+            legend=dict(x=0.02, y=0.98),
+            width=1000,
+            height=600,
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=1, label="1m", step="month", stepmode="backward"),
+                        dict(count=6, label="6m", step="month", stepmode="backward"),
+                        dict(count=1, label="YTD", step="year", stepmode="todate"),
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(count=3, label="3y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True, thickness=0.05),
+                type="date"
+            )
+        )
+        
+        return fig
+    
+    @staticmethod
+    def plot_multiple_rolling_metrics(
+        portfolios: Dict[str, 'Portfolio'],
+        metric: str = "sharpe",
+        window: int = 126,
+        title: str = "Rolling Metrics Comparison"
+    ) -> go.Figure:
+        """
+        Plot rolling metrics for multiple portfolios with date slider.
+        
+        Args:
+            portfolios: Dictionary of portfolio names to Portfolio objects
+            metric: Type of metric ("sharpe", "volatility", "returns")
+            window: Rolling window size
+            title: Plot title
+            
+        Returns:
+            Plotly figure
+        """
+        fig = go.Figure()
+        colors = ['blue', 'red', 'green', 'purple', 'orange', 'brown', 'pink', 'gray']
+        
+        for i, (name, portfolio) in enumerate(portfolios.items()):
+            if portfolio.portfolio_returns is None:
+                try:
+                    portfolio.calculate_portfolio_returns()
+                except:
+                    print(f"Warning: Could not calculate returns for {name}")
+                    continue
+            
+            returns = portfolio.portfolio_returns
+            if returns is None or len(returns) < window:
+                print(f"Warning: Insufficient data for {name} rolling metrics")
+                continue
+            
+            if metric == "sharpe":
+                try:
+                    # Simple rolling Sharpe calculation
+                    rolling_mean = returns.rolling(window).mean()
+                    rolling_std = returns.rolling(window).std()
+                    rolling_metric = (rolling_mean / rolling_std) * np.sqrt(252)
+                    y_label = "Rolling Sharpe Ratio"
+                except:
+                    print(f"Warning: Could not calculate rolling Sharpe for {name}")
+                    continue
+            elif metric == "volatility":
+                rolling_metric = returns.rolling(window).std() * np.sqrt(252) * 100
+                y_label = "Rolling Volatility (%)"
+            elif metric == "returns":
+                rolling_metric = returns.rolling(window).mean() * 252 * 100
+                y_label = "Rolling Returns (%)"
+            else:
+                continue
+            
+            fig.add_trace(go.Scatter(
+                x=rolling_metric.index,
+                y=rolling_metric.values,
+                mode='lines',
+                name=name,
+                line=dict(color=colors[i % len(colors)], width=2)
+            ))
+        
+        fig.update_layout(
+            title=title,
+            xaxis_title="Date",
+            yaxis_title=y_label,
+            hovermode='x unified',
+            width=1000,
+            height=600,
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=1, label="1m", step="month", stepmode="backward"),
+                        dict(count=6, label="6m", step="month", stepmode="backward"),
+                        dict(count=1, label="YTD", step="year", stepmode="todate"),
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(count=3, label="3y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True, thickness=0.05),
+                type="date"
+            )
+        )
+        
+        return fig

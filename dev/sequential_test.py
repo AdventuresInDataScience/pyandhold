@@ -304,9 +304,9 @@ def example_single_portfolio_all_visualizations():
 portfolio, metrics = example_single_portfolio_all_visualizations()
 
 portfolio
-metrics
+display(pd.DataFrame(metrics.items(), columns=["metric", "value"]))
 
-#%%
+#%% 2
 # ==============================================================================
 # SECTION 2: MULTIPLE PORTFOLIO COMPARISON
 # ==============================================================================
@@ -336,8 +336,13 @@ def example_multiple_portfolio_comparison():
     portfolios = {}
     
     # 1. Equal Weight
+    equal_weights = {ticker: 1/len(tickers) for ticker in tickers}
+    print(f"\n1. Equal Weight calculated weights:")
+    for ticker, weight in equal_weights.items():
+        print(f"   {ticker}: {weight:.4f}")
+    
     portfolios['Equal Weight'] = Portfolio(
-        weights={ticker: 1/len(tickers) for ticker in tickers},
+        weights=equal_weights,
         start_date='2020-01-01',
         end_date='2023-12-31',
         initial_capital=100000
@@ -345,7 +350,21 @@ def example_multiple_portfolio_comparison():
     
     # 2. Risk Parity
     optimizer = PortfolioOptimizer(returns)
-    rp_weights = optimizer.optimize_risk_parity()
+    print(f"\n2. Calculating Risk Parity weights...")
+    
+    try:
+        rp_weights = optimizer.optimize_risk_parity()
+        print(f"   Risk Parity optimization SUCCESS")
+    except Exception as e:
+        print(f"   Risk Parity optimization FAILED: {e}")
+        # Fallback to equal weights
+        rp_weights = {ticker: 1/len(tickers) for ticker in tickers}
+        print(f"   Using fallback equal weights for Risk Parity")
+    
+    print(f"Risk Parity calculated weights:")
+    for ticker, weight in rp_weights.items():
+        print(f"   {ticker}: {weight:.4f}")
+    
     portfolios['Risk Parity'] = Portfolio(
         weights=rp_weights,
         start_date='2020-01-01',
@@ -354,7 +373,20 @@ def example_multiple_portfolio_comparison():
     )
     
     # 3. Max Sharpe
-    sharpe_weights = optimizer.optimize_sharpe()
+    print(f"\n3. Calculating Max Sharpe weights...")
+    try:
+        sharpe_weights = optimizer.optimize_sharpe()
+        print(f"   Max Sharpe optimization SUCCESS")
+    except Exception as e:
+        print(f"   Max Sharpe optimization FAILED: {e}")
+        # Fallback to equal weights
+        sharpe_weights = {ticker: 1/len(tickers) for ticker in tickers}
+        print(f"   Using fallback equal weights for Max Sharpe")
+    
+    print(f"Max Sharpe calculated weights:")
+    for ticker, weight in sharpe_weights.items():
+        print(f"   {ticker}: {weight:.4f}")
+    
     portfolios['Max Sharpe'] = Portfolio(
         weights=sharpe_weights,
         start_date='2020-01-01',
@@ -363,7 +395,20 @@ def example_multiple_portfolio_comparison():
     )
     
     # 4. Min Variance
-    minvar_weights = optimizer.optimize_min_variance()
+    print(f"\n4. Calculating Min Variance weights...")
+    try:
+        minvar_weights = optimizer.optimize_min_variance()
+        print(f"   Min Variance optimization SUCCESS")
+    except Exception as e:
+        print(f"   Min Variance optimization FAILED: {e}")
+        # Fallback to equal weights
+        minvar_weights = {ticker: 1/len(tickers) for ticker in tickers}
+        print(f"   Using fallback equal weights for Min Variance")
+    
+    print(f"Min Variance calculated weights:")
+    for ticker, weight in minvar_weights.items():
+        print(f"   {ticker}: {weight:.4f}")
+    
     portfolios['Min Variance'] = Portfolio(
         weights=minvar_weights,
         start_date='2020-01-01',
@@ -372,8 +417,14 @@ def example_multiple_portfolio_comparison():
     )
     
     # 5. 60/40 Portfolio (SPY/TLT only)
+    portfolio_60_40_weights = {'SPY': 0.6, 'TLT': 0.4, 'GLD': 0, 'VNQ': 0, 'DBC': 0, 'EEM': 0}
+    print(f"\n5. 60/40 Portfolio weights:")
+    for ticker, weight in portfolio_60_40_weights.items():
+        if weight > 0:
+            print(f"   {ticker}: {weight:.4f}")
+    
     portfolios['60/40'] = Portfolio(
-        weights={'SPY': 0.6, 'TLT': 0.4, 'GLD': 0, 'VNQ': 0, 'DBC': 0, 'EEM': 0},
+        weights=portfolio_60_40_weights,
         start_date='2020-01-01',
         end_date='2023-12-31',
         initial_capital=100000
@@ -406,7 +457,23 @@ def example_multiple_portfolio_comparison():
         xaxis_title="Date",
         yaxis_title="Portfolio Value ($)",
         hovermode='x unified',
-        legend=dict(x=0.02, y=0.98)
+        legend=dict(x=0.02, y=0.98),
+        width=1000,
+        height=600,
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=3, label="3y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True, thickness=0.05),
+            type="date"
+        )
     )
     fig.show()
     
@@ -428,7 +495,23 @@ def example_multiple_portfolio_comparison():
         title="Cumulative Returns Comparison",
         xaxis_title="Date",
         yaxis_title="Cumulative Return (%)",
-        hovermode='x unified'
+        hovermode='x unified',
+        width=1000,
+        height=600,
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=3, label="3y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True, thickness=0.05),
+            type="date"
+        )
     )
     fig.show()
     
@@ -453,7 +536,23 @@ def example_multiple_portfolio_comparison():
         title="Drawdown Comparison",
         xaxis_title="Date",
         yaxis_title="Drawdown (%)",
-        hovermode='x unified'
+        hovermode='x unified',
+        width=1000,
+        height=600,
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=3, label="3y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True, thickness=0.05),
+            type="date"
+        )
     )
     fig.show()
     
@@ -466,10 +565,9 @@ def example_multiple_portfolio_comparison():
         if portfolio.portfolio_returns is None:
             portfolio.calculate_portfolio_returns()
         
-        rolling_sharpe = portfolio.portfolio_returns.rolling(window).apply(
-            lambda x: PerformanceMetrics.sharpe_ratio(pd.DataFrame(x, columns=['returns'])).iloc[0]
-            if len(x) > 5 else np.nan  # Avoid calculation with too few data points
-        )
+        rolling_mean = portfolio.portfolio_returns.rolling(window).mean()
+        rolling_std = portfolio.portfolio_returns.rolling(window).std()
+        rolling_sharpe = (rolling_mean / rolling_std) * np.sqrt(252)
         
         fig.add_trace(go.Scatter(
             x=rolling_sharpe.index,
@@ -483,13 +581,31 @@ def example_multiple_portfolio_comparison():
         title="126-Day Rolling Sharpe Ratio Comparison",
         xaxis_title="Date",
         yaxis_title="Sharpe Ratio",
-        hovermode='x unified'
+        hovermode='x unified',
+        width=1000,
+        height=600,
+        xaxis=dict(
+            rangeselector=dict(
+                buttons=list([
+                    dict(count=1, label="1m", step="month", stepmode="backward"),
+                    dict(count=6, label="6m", step="month", stepmode="backward"),
+                    dict(count=1, label="YTD", step="year", stepmode="todate"),
+                    dict(count=1, label="1y", step="year", stepmode="backward"),
+                    dict(count=3, label="3y", step="year", stepmode="backward"),
+                    dict(step="all")
+                ])
+            ),
+            rangeslider=dict(visible=True, thickness=0.05),
+            type="date"
+        )
     )
     fig.show()
     
     return portfolios, all_metrics
 
 portfolios, all_metrics = example_multiple_portfolio_comparison()
+display(pd.DataFrame(all_metrics))
+
 
 #%%
 # ==============================================================================
