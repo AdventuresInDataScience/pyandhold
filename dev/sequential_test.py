@@ -320,7 +320,7 @@ def example_multiple_portfolio_comparison():
     
     # Download data once
     downloader = DataDownloader()
-    tickers = ['SPY', 'TLT', 'GLD', 'VNQ', 'DBC', 'EEM']
+    tickers = ['SPY', 'NVDA']
     prices, returns = downloader.download_prices_and_returns(
         tickers,
         start_date='2000-01-01',

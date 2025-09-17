@@ -5,6 +5,7 @@ import pandas as pd
 import cvxpy as cp
 from typing import Dict, Optional, Tuple, List, Union
 from scipy.optimize import minimize
+import marsopt
 from ..metrics.risk import RiskMetrics
 from ..metrics.performance import PerformanceMetrics
 
@@ -16,7 +17,8 @@ class PortfolioOptimizer:
         self,
         returns: pd.DataFrame,
         risk_free_rate: float = 0.02,
-        periods_per_year: int = 252
+        periods_per_year: int = 252,
+        optimizer: str = 'mars'
     ):
         """
         Initialize optimizer.
@@ -25,11 +27,13 @@ class PortfolioOptimizer:
             returns: DataFrame of asset returns
             risk_free_rate: Annual risk-free rate
             periods_per_year: Number of periods in a year
+            optimizer: Optimization method ('scipy' or 'mars')
         """
         self.returns = returns
         self.risk_free_rate = risk_free_rate
         self.periods_per_year = periods_per_year
         self.n_assets = len(returns.columns)
+        self.optimizer = optimizer
         
         # Pre-calculate frequently used matrices
         self.mean_returns = returns.mean()
@@ -39,7 +43,9 @@ class PortfolioOptimizer:
         self,
         weight_bounds: Tuple[float, float] = (0, 1),
         constraints: Optional[Dict] = None,
-        verbose: bool = False
+        verbose: bool = False,
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
     ) -> Dict[str, float]:
         """
         Maximize Sharpe ratio.
@@ -48,6 +54,8 @@ class PortfolioOptimizer:
             weight_bounds: Min and max weight for each asset
             constraints: Additional constraints
             verbose: Print optimization details
+            n_trials: Number of trials (marsopt only)
+            initial_noise: Initial noise level (marsopt only)
             
         Returns:
             Dictionary of optimal weights
@@ -69,12 +77,17 @@ class PortfolioOptimizer:
             sharpe = (portfolio_return - self.risk_free_rate/self.periods_per_year) / volatility
             return -sharpe * np.sqrt(self.periods_per_year)
         
-        return self._optimize(negative_sharpe, weight_bounds, constraints, verbose)
+        return self._optimize(
+            negative_sharpe, weight_bounds, constraints, verbose, 
+            n_trials=n_trials, initial_noise=initial_noise
+        )
     
     def optimize_min_variance(
         self,
         weight_bounds: Tuple[float, float] = (0, 1),
-        constraints: Optional[Dict] = None
+        constraints: Optional[Dict] = None,
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
     ) -> Dict[str, float]:
         """
         Minimize portfolio variance.
@@ -82,6 +95,8 @@ class PortfolioOptimizer:
         Args:
             weight_bounds: Min and max weight for each asset
             constraints: Additional constraints
+            n_trials: Number of trials (marsopt only)
+            initial_noise: Initial noise level (marsopt only)
             
         Returns:
             Dictionary of optimal weights
@@ -90,13 +105,18 @@ class PortfolioOptimizer:
             weights = np.array(weights)
             return np.dot(weights.T, np.dot(self.cov_matrix, weights))
         
-        return self._optimize(portfolio_variance, weight_bounds, constraints)
+        return self._optimize(
+            portfolio_variance, weight_bounds, constraints,
+            n_trials=n_trials, initial_noise=initial_noise
+        )
     
     def optimize_max_return(
         self,
         max_volatility: float,
         weight_bounds: Tuple[float, float] = (0, 1),
-        constraints: Optional[Dict] = None
+        constraints: Optional[Dict] = None,
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
     ) -> Dict[str, float]:
         """
         Maximize return subject to volatility constraint.
@@ -105,6 +125,8 @@ class PortfolioOptimizer:
             max_volatility: Maximum allowed volatility (annualized)
             weight_bounds: Min and max weight for each asset
             constraints: Additional constraints
+            n_trials: Number of trials (marsopt only)
+            initial_noise: Initial noise level (marsopt only)
             
         Returns:
             Dictionary of optimal weights
@@ -125,17 +147,24 @@ class PortfolioOptimizer:
             'fun': volatility_constraint
         }
         
-        return self._optimize(negative_return, weight_bounds, constraints)
+        return self._optimize(
+            negative_return, weight_bounds, constraints,
+            n_trials=n_trials, initial_noise=initial_noise
+        )
     
     def optimize_risk_parity(
         self,
-        weight_bounds: Tuple[float, float] = (0, 1)
+        weight_bounds: Tuple[float, float] = (0, 1),
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
     ) -> Dict[str, float]:
         """
         Risk parity optimization - equal risk contribution.
         
         Args:
             weight_bounds: Min and max weight for each asset
+            n_trials: Number of trials (marsopt only)
+            initial_noise: Initial noise level (marsopt only)
             
         Returns:
             Dictionary of optimal weights
@@ -162,7 +191,10 @@ class PortfolioOptimizer:
             # Minimize sum of squared deviations from target
             return np.sum((risk_contrib - target_contrib) ** 2)
         
-        return self._optimize(risk_parity_objective, weight_bounds)
+        return self._optimize(
+            risk_parity_objective, weight_bounds,
+            n_trials=n_trials, initial_noise=initial_noise
+        )
     
     def optimize_cvar(
         self,
@@ -287,19 +319,112 @@ class PortfolioOptimizer:
         objective_func,
         weight_bounds: Tuple[float, float] = (0, 1),
         constraints: Optional[Dict] = None,
-        verbose: bool = False
+        verbose: bool = False,
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
     ) -> Dict[str, float]:
         """
-        Generic optimization function with multiple solvers and initializations.
+        Generic optimization function that routes to scipy or marsopt.
         
         Args:
             objective_func: Objective function to minimize
             weight_bounds: Min and max weight for each asset
             constraints: Additional constraints
             verbose: Print optimization details
+            n_trials: Number of trials (marsopt only)
+            initial_noise: Initial noise level (marsopt only)
             
         Returns:
             Dictionary of optimal weights
+        """
+        if self.optimizer == 'mars':
+            return self._optimize_mars(
+                objective_func, weight_bounds, constraints, verbose, 
+                n_trials, initial_noise
+            )
+        else:  # Default to scipy
+            return self._optimize_scipy(
+                objective_func, weight_bounds, constraints, verbose
+            )
+    
+    def _optimize_mars(
+        self,
+        objective_func,
+        weight_bounds: Tuple[float, float] = (0, 1),
+        constraints: Optional[Dict] = None,
+        verbose: bool = False,
+        n_trials: int = 1000,
+        initial_noise: float = 0.2
+    ) -> Dict[str, float]:
+        """
+        MARS optimization implementation.
+        """
+        def mars_objective(trial):
+            # Suggest weights for each asset
+            weights = []
+            for i in range(self.n_assets):
+                weight = trial.suggest_float(f'w_{i}', weight_bounds[0], weight_bounds[1])
+                weights.append(weight)
+            
+            weights = np.array(weights)
+            weights = weights / np.sum(weights)  # Normalize to sum to 1
+            
+            # Handle constraints as penalties
+            objective_value = objective_func(weights)
+            
+            if constraints:
+                for name, constraint in constraints.items():
+                    if name == 'volatility':
+                        # Volatility constraint handling
+                        constraint_func = constraint['fun']
+                        constraint_val = constraint_func(weights)
+                        if constraint_val < 0:  # Constraint violated
+                            penalty = 1000 * abs(constraint_val)
+                            objective_value += penalty
+                    elif name == 'return':
+                        # Return constraint handling
+                        constraint_func = constraint['fun']
+                        constraint_val = constraint_func(weights)
+                        if constraint['type'] == 'eq' and abs(constraint_val) > 1e-6:
+                            penalty = 1000 * abs(constraint_val)
+                            objective_value += penalty
+                        elif constraint['type'] == 'ineq' and constraint_val < 0:
+                            penalty = 1000 * abs(constraint_val)
+                            objective_value += penalty
+            
+            return objective_value
+        
+        # Create study
+        study = marsopt.Study(
+            direction='minimize',
+            initial_noise=initial_noise,
+            verbose=False,  # Always set to False to avoid spam
+            random_state=42
+        )
+        
+        # Optimize
+        study.optimize(mars_objective, n_trials)
+        
+        # Extract best weights
+        best_trial = study.best_trial
+        weights = []
+        for i in range(self.n_assets):
+            weights.append(best_trial['variables'][f'w_{i}'])
+        
+        weights = np.array(weights)
+        weights = weights / np.sum(weights)  # Normalize
+        
+        return dict(zip(self.returns.columns, weights))
+    
+    def _optimize_scipy(
+        self,
+        objective_func,
+        weight_bounds: Tuple[float, float] = (0, 1),
+        constraints: Optional[Dict] = None,
+        verbose: bool = False
+    ) -> Dict[str, float]:
+        """
+        SciPy optimization implementation (original method).
         """
         # Bounds for each weight
         bounds = tuple((weight_bounds[0], weight_bounds[1]) for _ in range(self.n_assets))
