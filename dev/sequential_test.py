@@ -321,14 +321,9 @@ def example_multiple_portfolio_comparison():
     # Download data once
     downloader = DataDownloader()
     tickers = ['SPY', 'TLT', 'GLD', 'VNQ', 'DBC', 'EEM']
-    prices = downloader.download_data(
+    prices, returns = downloader.download_prices_and_returns(
         tickers,
-        start_date='2020-01-01',
-        end_date='2023-12-31'
-    )
-    returns = downloader.download_returns(
-        tickers,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31'
     )
     
@@ -343,7 +338,7 @@ def example_multiple_portfolio_comparison():
     
     portfolios['Equal Weight'] = Portfolio(
         weights=equal_weights,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )
@@ -367,7 +362,7 @@ def example_multiple_portfolio_comparison():
     
     portfolios['Risk Parity'] = Portfolio(
         weights=rp_weights,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )
@@ -389,7 +384,7 @@ def example_multiple_portfolio_comparison():
     
     portfolios['Max Sharpe'] = Portfolio(
         weights=sharpe_weights,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )
@@ -411,7 +406,7 @@ def example_multiple_portfolio_comparison():
     
     portfolios['Min Variance'] = Portfolio(
         weights=minvar_weights,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )
@@ -425,7 +420,7 @@ def example_multiple_portfolio_comparison():
     
     portfolios['60/40'] = Portfolio(
         weights=portfolio_60_40_weights,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )

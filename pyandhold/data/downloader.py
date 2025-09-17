@@ -30,8 +30,9 @@ class DataDownloader:
         interval: str = "1d",
         auto_adjust: bool = True,
         prepost: bool = False,
-        threads: bool = True
-    ) -> pd.DataFrame:
+        threads: bool = True,
+        return_both: bool = False
+    ) -> Union[pd.DataFrame, tuple[pd.DataFrame, pd.DataFrame]]:
         """
         Download historical price data for multiple tickers.
         
@@ -43,9 +44,11 @@ class DataDownloader:
             auto_adjust: Adjust for dividends and splits
             prepost: Include pre/post market data
             threads: Use multithreading for download
+            return_both: If True, return tuple of (prices, returns)
             
         Returns:
             DataFrame with adjusted close prices, columns are tickers
+            Or if return_both=True: tuple of (prices DataFrame, returns DataFrame)
         """
         if end_date is None:
             end_date = datetime.now()
@@ -84,6 +87,10 @@ class DataDownloader:
         # Remove any tickers with all NaN values
         prices = prices.dropna(axis=1, how='all')
         
+        if return_both:
+            returns = prices.pct_change().dropna()
+            return prices, returns
+        
         return prices
     
     def download_returns(
@@ -108,6 +115,27 @@ class DataDownloader:
         prices = self.download_data(tickers, start_date, end_date, **kwargs)
         returns = prices.pct_change().dropna()
         return returns
+    
+    def download_prices_and_returns(
+        self,
+        tickers: List[str],
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime] = None,
+        **kwargs
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Download price data and calculate returns in a single efficient call.
+        
+        Args:
+            tickers: List of ticker symbols
+            start_date: Start date for data
+            end_date: End date for data
+            **kwargs: Additional arguments for download_data
+            
+        Returns:
+            Tuple of (prices DataFrame, returns DataFrame)
+        """
+        return self.download_data(tickers, start_date, end_date, return_both=True, **kwargs)
     
     def get_benchmark_data(
         self,
