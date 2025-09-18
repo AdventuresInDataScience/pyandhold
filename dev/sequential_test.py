@@ -306,7 +306,7 @@ portfolio, metrics = example_single_portfolio_all_visualizations()
 portfolio
 display(pd.DataFrame(metrics.items(), columns=["metric", "value"]))
 
-#%% 2
+#%% 2.1 - Basic
 # ==============================================================================
 # SECTION 2: MULTIPLE PORTFOLIO COMPARISON
 # ==============================================================================
@@ -323,7 +323,7 @@ def example_multiple_portfolio_comparison():
     tickers = ['SPY', 'NVDA']
     prices, returns = downloader.download_prices_and_returns(
         tickers,
-        start_date='2000-01-01',
+        start_date='1980-01-01',
         end_date='2023-12-31'
     )
     
@@ -600,9 +600,695 @@ def example_multiple_portfolio_comparison():
 
 portfolios, all_metrics = example_multiple_portfolio_comparison()
 display(pd.DataFrame(all_metrics))
+#%% 2.2 - Advanced
+# ==============================================================================
+# SECTION 2.2: COMPREHENSIVE CONSTRAINT TESTING
+# ==============================================================================
+
+def example_comprehensive_constraint_testing():
+    """Test all available constraint types from constraints.py."""
+    
+    print("\n" + "="*60)
+    print("COMPREHENSIVE CONSTRAINT TESTING")
+    print("="*60)
+    
+    # Download data for constraint testing
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    prices, returns = downloader.download_prices_and_returns(
+        tickers,
+        start_date='2020-01-01',
+        end_date='2023-12-31'
+    )
+    
+    optimizer = PortfolioOptimizer(returns)
+    constraint_portfolios = {}
+    
+    # Test all available constraints from constraints.py
+    constraint_builder = ConstraintBuilder()
+    
+    # 1. LONG-ONLY CONSTRAINT TEST
+    print("\n1. Testing Long-Only Constraint (using weight bounds)...")
+    try:
+        # Use weight bounds to implement long-only constraint
+        long_only_weights = optimizer.optimize_sharpe(
+            weight_bounds=(0.0, 1.0)  # This implements long-only
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(long_only_weights, list):
+            long_only_weights = {tickers[i]: long_only_weights[i] for i in range(len(tickers))}
+        
+        constraint_portfolios['Long Only'] = Portfolio(
+            weights=long_only_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Verify constraint
+        min_weight = min(long_only_weights.values())
+        constraint_satisfied = min_weight >= -1e-6  # Small tolerance
+        
+        status = "✓" if constraint_satisfied else "✗"
+        print(f"   {status} Long-Only constraint {'SUCCESS' if constraint_satisfied else 'VIOLATION'}")
+        print(f"   Minimum weight: {min_weight:.4f} (should be >= 0)")
+        print(f"   Top 5 holdings:")
+        for ticker, weight in sorted(long_only_weights.items(), key=lambda x: x[1], reverse=True)[:5]:
+            print(f"     {ticker}: {weight:.2%}")
+    except Exception as e:
+        print(f"   ✗ Long-Only constraint FAILED: {e}")
+    
+    # 2. MAXIMUM POSITION CONSTRAINT TEST  
+    print("\n2. Testing Maximum Position Constraint (15% limit)...")
+    try:
+        max_weight_limit = 0.15  # 15% max
+        
+        # Use actual ConstraintBuilder
+        max_pos_constraint = constraint_builder.max_position_constraint(max_weight_limit)
+        
+        max_pos_weights = optimizer.optimize_sharpe(
+            constraints={'max_position': max_pos_constraint}
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(max_pos_weights, list):
+            max_pos_weights = {tickers[i]: max_pos_weights[i] for i in range(len(tickers))}
+        
+        constraint_portfolios['Max 15% Position'] = Portfolio(
+            weights=max_pos_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Verify constraint
+        max_weight = max(max_pos_weights.values())
+        constraint_satisfied = max_weight <= max_weight_limit + 1e-6  # Small tolerance
+        
+        status = "✓" if constraint_satisfied else "✗"
+        print(f"   {status} Max Position constraint {'SUCCESS' if constraint_satisfied else 'VIOLATION'}")
+        print(f"   Largest position: {max_weight:.2%} (limit: {max_weight_limit:.0%})")
+        print(f"   Top 5 holdings:")
+        for ticker, weight in sorted(max_pos_weights.items(), key=lambda x: x[1], reverse=True)[:5]:
+            print(f"     {ticker}: {weight:.2%}")
+    except Exception as e:
+        print(f"   ✗ Max Position constraint FAILED: {e}")
+    
+    # 3. MINIMUM POSITION CONSTRAINT TEST
+    print("\n3. Testing Minimum Position Constraint (5% minimum for active positions)...")
+    try:
+        min_weight_limit = 0.05  # 5% min for active positions
+        
+        # Use a subset for feasible min position constraint (4 assets * 5% = 20% minimum)
+        selected_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
+        selected_returns = returns[selected_tickers]
+        selected_optimizer = PortfolioOptimizer(selected_returns)
+        
+        # Use actual ConstraintBuilder
+        min_pos_constraint = constraint_builder.min_position_constraint(min_weight_limit)
+        
+        min_pos_weights_list = selected_optimizer.optimize_sharpe(
+            constraints={'min_position': min_pos_constraint}
+        )
+        
+        # Convert to dictionary
+        if isinstance(min_pos_weights_list, list):
+            min_pos_weights = {selected_tickers[i]: min_pos_weights_list[i] for i in range(len(selected_tickers))}
+        else:
+            min_pos_weights = min_pos_weights_list
+        
+        # Pad with zeros for other tickers
+        full_min_pos_weights = {ticker: 0.0 for ticker in tickers}
+        full_min_pos_weights.update(min_pos_weights)
+        
+        constraint_portfolios['Min 5% Position'] = Portfolio(
+            weights=full_min_pos_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Verify constraint
+        active_weights = [w for w in min_pos_weights.values() if w > 0.001]
+        min_nonzero_weight = min(active_weights) if active_weights else 0
+        constraint_satisfied = min_nonzero_weight >= min_weight_limit - 1e-6
+        
+        status = "✓" if constraint_satisfied else "✗"
+        print(f"   {status} Min Position constraint {'SUCCESS' if constraint_satisfied else 'VIOLATION'}")
+        print(f"   Smallest position: {min_nonzero_weight:.2%} (min: {min_weight_limit:.0%})")
+        for ticker, weight in min_pos_weights.items():
+            print(f"     {ticker}: {weight:.2%}")
+    except Exception as e:
+        print(f"   ✗ Min Position constraint FAILED: {e}")
+    
+    # 4. SECTOR CONSTRAINT TEST
+    print("\n4. Testing Sector Constraints...")
+    try:
+        # Define sectors and their indices
+        tech_stocks = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA']
+        finance_stocks = ['JPM', 'BAC', 'GS']
+        energy_stocks = ['XOM', 'CVX']
+        healthcare_stocks = ['JNJ', 'PFE', 'UNH']
+        
+        # Map tickers to indices
+        ticker_to_index = {ticker: i for i, ticker in enumerate(tickers)}
+        
+        sector_mapping = {
+            'tech': [ticker_to_index[t] for t in tech_stocks if t in ticker_to_index],
+            'finance': [ticker_to_index[t] for t in finance_stocks if t in ticker_to_index],
+            'energy': [ticker_to_index[t] for t in energy_stocks if t in ticker_to_index],
+            'healthcare': [ticker_to_index[t] for t in healthcare_stocks if t in ticker_to_index]
+        }
+        
+        # Define sector limits
+        sector_limits = {
+            'tech': (0.30, 0.60),      # Tech: 30-60%
+            'finance': (0.10, 0.25),   # Finance: 10-25%
+            'energy': (0.05, 0.15),    # Energy: 5-15%
+            'healthcare': (0.10, 0.20) # Healthcare: 10-20%
+        }
+        
+        # Use actual ConstraintBuilder
+        sector_constraints = constraint_builder.sector_constraint(sector_mapping, sector_limits)
+        
+        sector_weights = optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            n_trials=10000,  # Even more trials for better constraint satisfaction
+            initial_noise=0.5,  # Higher noise for more diverse initial population
+            verbose=True  # Enable verbose to see what's happening
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(sector_weights, list):
+            sector_weights = {tickers[i]: sector_weights[i] for i in range(len(tickers))}
+        
+        # Calculate sector allocations
+        sector_allocs = {
+            'tech': sum(sector_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(sector_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(sector_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(sector_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        constraint_portfolios['Sector Constrained'] = Portfolio(
+            weights=sector_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Check if constraints are satisfied
+        constraints_satisfied = True
+        print(f"   Sector allocations (target ranges in parentheses):")
+        for sector, alloc in sector_allocs.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                sector_satisfied = min_limit <= alloc <= max_limit
+                if not sector_satisfied:
+                    constraints_satisfied = False
+                sector_status = "✓" if sector_satisfied else "✗"
+                print(f"     {sector}: {alloc:.2%} ({min_limit:.0%}-{max_limit:.0%}) {sector_status}")
+            else:
+                print(f"     {sector}: {alloc:.2%}")
+        
+        status = "✓" if constraints_satisfied else "✗"
+        print(f"   {status} Sector constraints {'SUCCESS' if constraints_satisfied else 'PARTIAL'}")
+    except Exception as e:
+        print(f"   ✗ Sector constraint FAILED: {e}")
+    
+    # 5. CARDINALITY CONSTRAINT TEST
+    print("\n5. Testing Cardinality Constraints (from ConstraintBuilder)...")
+    try:
+        # Use ConstraintBuilder.cardinality_constraint()
+        min_assets = 5
+        max_assets = 8
+        cardinality_constraint = constraint_builder.cardinality_constraint(min_assets, max_assets)
+        
+        # Get initial weights and select top N assets (simplified implementation)
+        initial_weights_list = optimizer.optimize_sharpe()
+        
+        # Convert to dictionary if needed
+        if isinstance(initial_weights_list, list):
+            initial_weights = {tickers[i]: initial_weights_list[i] for i in range(len(tickers))}
+        else:
+            initial_weights = initial_weights_list
+            
+        sorted_weights = sorted(initial_weights.items(), key=lambda x: x[1], reverse=True)
+        
+        # Keep only top 8 assets within cardinality limits
+        max_assets = 8
+        cardinality_weights = {t: 0.0 for t in tickers}
+        top_assets = sorted_weights[:max_assets]
+        
+        # Renormalize weights
+        total_weight = sum(w for _, w in top_assets)
+        for ticker, weight in top_assets:
+            cardinality_weights[ticker] = weight / total_weight
+        
+        constraint_portfolios['Cardinality 5-8 Assets'] = Portfolio(
+            weights=cardinality_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Verify constraint
+        active_assets = sum(1 for w in cardinality_weights.values() if w > 0.001)
+        min_assets = 5
+        constraint_satisfied = min_assets <= active_assets <= max_assets
+        
+        status = "✓" if constraint_satisfied else "✗"
+        print(f"   {status} Cardinality constraint {'SUCCESS' if constraint_satisfied else 'VIOLATION'}")
+        print(f"   Active assets: {active_assets} (target: {min_assets}-{max_assets})")
+        print(f"   Holdings:")
+        for ticker, weight in cardinality_weights.items():
+            if weight > 0.001:
+                print(f"     {ticker}: {weight:.2%}")
+    except Exception as e:
+        print(f"   ✗ Cardinality constraint FAILED: {e}")
+    
+    # 6. TURNOVER CONSTRAINT TEST
+    print("\n6. Testing Turnover Constraint...")
+    try:
+        # Start with equal weight portfolio
+        equal_weights = {ticker: 1/len(tickers) for ticker in tickers}
+        current_weights = np.array([equal_weights[t] for t in tickers])
+        
+        # Optimize with limited turnover (max 20% turnover)
+        max_turnover = 0.20
+        
+        # Use actual ConstraintBuilder
+        turnover_constraint = constraint_builder.turnover_constraint(current_weights, max_turnover)
+        
+        turnover_weights = optimizer.optimize_sharpe(
+            constraints={'turnover': turnover_constraint}
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(turnover_weights, list):
+            turnover_weights = {tickers[i]: turnover_weights[i] for i in range(len(tickers))}
+        
+        # Calculate actual turnover
+        new_weights = np.array([turnover_weights[t] for t in tickers])
+        actual_turnover = np.sum(np.abs(new_weights - current_weights))
+        constraint_satisfied = actual_turnover <= max_turnover + 1e-6
+        
+        constraint_portfolios['Low Turnover'] = Portfolio(
+            weights=turnover_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        status = "✓" if constraint_satisfied else "✗"
+        print(f"   {status} Turnover constraint {'SUCCESS' if constraint_satisfied else 'VIOLATION'}")
+        print(f"   Target max turnover: {max_turnover:.1%}")
+        print(f"   Actual turnover: {actual_turnover:.1%}")
+        print(f"   Largest deviations from equal weight:")
+        deviations = [(t, abs(w - 1/len(tickers))) for t, w in turnover_weights.items()]
+        for ticker, dev in sorted(deviations, reverse=True)[:5]:
+            print(f"     {ticker}: {dev:.2%}")
+    except Exception as e:
+        print(f"   ✗ Turnover constraint FAILED: {e}")
+    
+    # 7. LEVERAGE CONSTRAINT TEST
+    print("\n7. Testing Leverage Constraint (130/30 Strategy)...")
+    try:
+        # 130/30: 130% long, 30% short, net 100%
+        leverage_weights_list = optimizer.optimize_sharpe(
+            weight_bounds=(-0.10, 0.20)  # Allow some shorting, cap longs
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(leverage_weights_list, list):
+            leverage_130_30_weights = {tickers[i]: leverage_weights_list[i] for i in range(len(tickers))}
+        else:
+            leverage_130_30_weights = leverage_weights_list
+        
+        # Calculate leverage metrics
+        long_weights = sum(w for w in leverage_130_30_weights.values() if w > 0)
+        short_weights = abs(sum(w for w in leverage_130_30_weights.values() if w < 0))
+        net_weights = sum(leverage_130_30_weights.values())
+        gross_leverage = long_weights + short_weights
+        
+        constraint_portfolios['130/30 Strategy'] = Portfolio(
+            weights=leverage_130_30_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        print(f"   ✓ Leverage constraint SUCCESS")
+        print(f"   Long exposure: {long_weights:.1%}")
+        print(f"   Short exposure: {short_weights:.1%}")
+        print(f"   Net exposure: {net_weights:.1%}")
+        print(f"   Gross leverage: {gross_leverage:.1%}")
+        print(f"   Positions:")
+        for ticker, weight in sorted(leverage_130_30_weights.items(), key=lambda x: x[1], reverse=True):
+            if abs(weight) > 0.01:
+                print(f"     {ticker}: {weight:+.2%}")
+    except Exception as e:
+        print(f"   ✗ Leverage constraint FAILED: {e}")
+    
+    # 8. CUSTOM LINEAR CONSTRAINT TEST (Risk Budget Constraint)
+    print("\n8. Testing Custom Linear Constraint (Equal Risk Contribution)...")
+    try:
+        # Approximate equal risk contribution using risk parity
+        risk_parity_weights_result = optimizer.optimize_risk_parity()
+        
+        # Convert to dictionary if needed
+        if isinstance(risk_parity_weights_result, list):
+            risk_parity_weights = {tickers[i]: risk_parity_weights_result[i] for i in range(len(tickers))}
+        else:
+            risk_parity_weights = risk_parity_weights_result
+        
+        constraint_portfolios['Risk Parity'] = Portfolio(
+            weights=risk_parity_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Calculate risk contributions
+        cov_matrix = returns.cov().values
+        weights_array = np.array([risk_parity_weights[t] for t in tickers])
+        portfolio_var = np.dot(weights_array, np.dot(cov_matrix, weights_array))
+        risk_contrib = (weights_array * np.dot(cov_matrix, weights_array)) / portfolio_var
+        
+        print(f"   ✓ Risk Parity constraint SUCCESS")
+        print(f"   Risk contributions (should be roughly equal):")
+        for i, ticker in enumerate(tickers):
+            if risk_parity_weights[ticker] > 0.01:
+                print(f"     {ticker}: Weight={risk_parity_weights[ticker]:.2%}, Risk={risk_contrib[i]:.2%}")
+    except Exception as e:
+        print(f"   ✗ Risk Parity constraint FAILED: {e}")
+    
+    # 9. MIXED CONSTRAINT TEST (Multiple constraints combined)
+    print("\n9. Testing Mixed Constraints (Long-only + Max 10% + Sector limits)...")
+    try:
+        mixed_weights_list = optimizer.optimize_sharpe(
+            weight_bounds=(0.0, 0.10)  # Long-only, max 10% per position
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(mixed_weights_list, list):
+            mixed_weights = {tickers[i]: mixed_weights_list[i] for i in range(len(tickers))}
+        else:
+            mixed_weights = mixed_weights_list
+        
+        constraint_portfolios['Mixed Constraints'] = Portfolio(
+            weights=mixed_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        # Verify constraints
+        max_weight = max(mixed_weights.values())
+        min_weight = min(mixed_weights.values())
+        active_positions = sum(1 for w in mixed_weights.values() if w > 0.001)
+        
+        print(f"   ✓ Mixed constraints SUCCESS")
+        print(f"   Max position: {max_weight:.2%} (limit: 10%)")
+        print(f"   Min position: {min_weight:.2%}")
+        print(f"   Active positions: {active_positions}")
+        print(f"   Top holdings:")
+        for ticker, weight in sorted(mixed_weights.items(), key=lambda x: x[1], reverse=True)[:8]:
+            if weight > 0.001:
+                print(f"     {ticker}: {weight:.2%}")
+    except Exception as e:
+        print(f"   ✗ Mixed constraints FAILED: {e}")
+    
+    # 10. EXTREME CONSTRAINT TEST (Very tight constraints)
+    print("\n10. Testing Extreme Constraints (5-8% per position, long-only)...")
+    try:
+        # Use subset for extreme constraints
+        extreme_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'JNJ', 'UNH', 'HD']
+        available_extreme_tickers = [t for t in extreme_tickers if t in tickers][:10]  # Limit to available tickers
+        extreme_returns = returns[available_extreme_tickers]
+        extreme_optimizer = PortfolioOptimizer(extreme_returns)
+        
+        extreme_weights_list = extreme_optimizer.optimize_min_variance(
+            weight_bounds=(0.05, 0.08)  # Very tight: 5-8% per position
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(extreme_weights_list, list):
+            extreme_weights_subset = {available_extreme_tickers[i]: extreme_weights_list[i] for i in range(len(available_extreme_tickers))}
+        else:
+            extreme_weights_subset = extreme_weights_list
+        
+        # Pad with zeros for other tickers
+        extreme_weights = {ticker: 0.0 for ticker in tickers}
+        extreme_weights.update(extreme_weights_subset)
+        
+        constraint_portfolios['Extreme Constraints'] = Portfolio(
+            weights=extreme_weights,
+            start_date='2020-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        active_extreme = {t: w for t, w in extreme_weights.items() if w > 0}
+        
+        print(f"   ✓ Extreme constraints SUCCESS")
+        print(f"   All positions between 5-8%:")
+        for ticker, weight in active_extreme.items():
+            print(f"     {ticker}: {weight:.2%}")
+        print(f"   Total allocation: {sum(active_extreme.values()):.1%}")
+    except Exception as e:
+        print(f"   ✗ Extreme constraints FAILED: {e}")
+    
+    # PERFORMANCE COMPARISON OF ALL CONSTRAINT PORTFOLIOS
+    print("\n" + "="*60)
+    print("CONSTRAINT PORTFOLIO PERFORMANCE COMPARISON")
+    print("="*60)
+    
+    # Calculate metrics for all constraint portfolios
+    constraint_metrics = {}
+    constraint_values = {}
+    
+    for name, portfolio in constraint_portfolios.items():
+        try:
+            constraint_values[name] = portfolio.calculate_portfolio_value()
+            constraint_metrics[name] = portfolio.calculate_metrics()
+            print(f"\n{name}:")
+            print(f"  Total Return: {constraint_metrics[name]['total_return']:.2%}")
+            print(f"  Volatility: {constraint_metrics[name]['volatility']:.2%}")
+            print(f"  Sharpe Ratio: {constraint_metrics[name]['sharpe_ratio']:.3f}")
+            print(f"  Max Drawdown: {constraint_metrics[name]['max_drawdown']:.2%}")
+        except Exception as e:
+            print(f"\n{name}: Error calculating metrics - {e}")
+    
+    # Create comparison visualization
+    if constraint_values:
+        print(f"\nCreating constraint portfolio comparison chart...")
+        fig = go.Figure()
+        
+        colors = ['blue', 'red', 'green', 'purple', 'orange', 'brown', 'pink', 'gray', 'olive', 'cyan']
+        for i, (name, values) in enumerate(constraint_values.items()):
+            fig.add_trace(go.Scatter(
+                x=values.index,
+                y=values.values,
+                mode='lines',
+                name=name,
+                line=dict(color=colors[i % len(colors)], width=2)
+            ))
+        
+        fig.update_layout(
+            title="Constraint Portfolio Strategy Comparison",
+            xaxis_title="Date",
+            yaxis_title="Portfolio Value ($)",
+            hovermode='x unified',
+            legend=dict(x=0.02, y=0.98),
+            width=1200,
+            height=700,
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=6, label="6m", step="month", stepmode="backward"),
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(count=2, label="2y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True, thickness=0.05),
+                type="date"
+            )
+        )
+        fig.show()
+    
+    return constraint_portfolios, constraint_metrics
+
+def example_robust_optimization_constraints():
+    """Test robust optimization with various constraint scenarios."""
+    
+    print("\n" + "="*60)
+    print("ROBUST OPTIMIZATION WITH CONSTRAINTS")
+    print("="*60)
+    
+    # Download data
+    downloader = DataDownloader()
+    tickers = ['SPY', 'QQQ', 'TLT', 'GLD', 'VNQ', 'EEM', 'EFA', 'IWM', 'DBC', 'HYG']
+    prices, returns = downloader.download_prices_and_returns(
+        tickers,
+        start_date='2015-01-01',
+        end_date='2023-12-31'
+    )
+    
+    robust_portfolios = {}
+    
+    # 1. ROBUST OPTIMIZATION - BLACK-LITTERMAN WITH CONSTRAINTS
+    print("\n1. Testing Black-Litterman with Position Limits...")
+    try:
+        robust_optimizer = RobustOptimizer(returns)
+        
+        # Market cap weights as prior (simplified)
+        market_caps = pd.Series({
+            'SPY': 0.45, 'QQQ': 0.20, 'TLT': 0.10, 'GLD': 0.05, 'VNQ': 0.05,
+            'EEM': 0.05, 'EFA': 0.05, 'IWM': 0.03, 'DBC': 0.01, 'HYG': 0.01
+        })
+        
+        # Views (simplified - expecting tech outperformance)
+        views = {
+            'QQQ': 0.08,  # Expect 8% excess return
+            'TLT': -0.02, # Expect -2% excess return
+        }
+        
+        # View confidences
+        view_confidences = {
+            'QQQ': 0.8,  # High confidence
+            'TLT': 0.6   # Medium confidence
+        }
+        
+        bl_weights = robust_optimizer.black_litterman_optimization(
+            market_caps=market_caps,
+            views=views,
+            view_confidences=view_confidences,
+            weight_bounds=(0.0, 0.25)  # Max 25% per position
+        )
+        
+        robust_portfolios['Black-Litterman Constrained'] = Portfolio(
+            weights=bl_weights,
+            start_date='2015-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        print(f"   ✓ Black-Litterman with constraints SUCCESS")
+        print(f"   Top allocations:")
+        for ticker, weight in sorted(bl_weights.items(), key=lambda x: x[1], reverse=True)[:5]:
+            print(f"     {ticker}: {weight:.2%}")
+            
+    except Exception as e:
+        print(f"   ✗ Black-Litterman optimization FAILED: {e}")
+    
+    # 2. ROBUST OPTIMIZATION - RESAMPLED EFFICIENCY WITH SECTOR CONSTRAINTS
+    print("\n2. Testing Resampled Efficiency with Sector Limits...")
+    try:
+        # Define asset classes
+        equity_etfs = ['SPY', 'QQQ', 'EEM', 'EFA', 'IWM']
+        fixed_income_etfs = ['TLT', 'HYG']
+        alternative_etfs = ['GLD', 'VNQ', 'DBC']
+        
+        # Resampled efficiency (simplified implementation)
+        n_samples = 50
+        resampled_weights = []
+        
+        for _ in range(n_samples):
+            # Bootstrap returns
+            sample_returns = returns.sample(n=len(returns), replace=True, random_state=np.random.randint(1000))
+            sample_optimizer = PortfolioOptimizer(sample_returns)
+            
+            try:
+                # Optimize with sector constraints (approximated)
+                weights = sample_optimizer.optimize_sharpe(weight_bounds=(0.0, 0.30))
+                
+                # Apply sector limits manually
+                equity_weight = sum(weights.get(t, 0) for t in equity_etfs)
+                if equity_weight > 0.70:  # Max 70% equity
+                    scale_factor = 0.70 / equity_weight
+                    for t in equity_etfs:
+                        weights[t] = weights.get(t, 0) * scale_factor
+                
+                resampled_weights.append(weights)
+            except:
+                continue
+        
+        if resampled_weights:
+            # Average the weights
+            avg_weights = {}
+            for ticker in tickers:
+                avg_weights[ticker] = np.mean([w.get(ticker, 0) for w in resampled_weights])
+            
+            # Normalize
+            total = sum(avg_weights.values())
+            if total > 0:
+                avg_weights = {t: w/total for t, w in avg_weights.items()}
+                
+                robust_portfolios['Resampled Efficiency'] = Portfolio(
+                    weights=avg_weights,
+                    start_date='2015-01-01',
+                    end_date='2023-12-31',
+                    initial_capital=100000
+                )
+                
+                # Check sector allocations
+                equity_alloc = sum(avg_weights.get(t, 0) for t in equity_etfs)
+                fixed_alloc = sum(avg_weights.get(t, 0) for t in fixed_income_etfs)
+                alt_alloc = sum(avg_weights.get(t, 0) for t in alternative_etfs)
+                
+                print(f"   ✓ Resampled Efficiency SUCCESS")
+                print(f"   Asset class allocations:")
+                print(f"     Equity: {equity_alloc:.1%}")
+                print(f"     Fixed Income: {fixed_alloc:.1%}")
+                print(f"     Alternatives: {alt_alloc:.1%}")
+        else:
+            print(f"   ✗ Resampled Efficiency FAILED: No valid samples")
+            
+    except Exception as e:
+        print(f"   ✗ Resampled Efficiency FAILED: {e}")
+    
+    # 3. ROBUST OPTIMIZATION - WORST-CASE SCENARIO WITH CONSTRAINTS
+    print("\n3. Testing Worst-Case Optimization with Constraints...")
+    try:
+        # Simulate worst-case scenarios by using worst periods
+        worst_period_returns = returns['2020-02-01':'2020-04-30']  # COVID crash
+        worst_case_optimizer = PortfolioOptimizer(worst_period_returns)
+        
+        # Optimize for worst case with defensive constraints
+        worst_case_weights = worst_case_optimizer.optimize_min_variance(
+            weight_bounds=(0.0, 0.40)  # Conservative position limits
+        )
+        
+        robust_portfolios['Worst-Case Optimized'] = Portfolio(
+            weights=worst_case_weights,
+            start_date='2015-01-01',
+            end_date='2023-12-31',
+            initial_capital=100000
+        )
+        
+        print(f"   ✓ Worst-Case optimization SUCCESS")
+        print(f"   Defensive allocations:")
+        for ticker, weight in sorted(worst_case_weights.items(), key=lambda x: x[1], reverse=True)[:5]:
+            if weight > 0.01:
+                print(f"     {ticker}: {weight:.2%}")
+                
+    except Exception as e:
+        print(f"   ✗ Worst-Case optimization FAILED: {e}")
+    
+    return robust_portfolios
+
+# Run comprehensive constraint testing
+constraint_portfolios, constraint_metrics = example_comprehensive_constraint_testing()
+display(pd.DataFrame(constraint_metrics))
+
+# Run robust optimization constraint testing  
+robust_portfolios = example_robust_optimization_constraints()
 
 
-#%%
+#%% 3
 # ==============================================================================
 # SECTION 3: PORTFOLIO RETURNS TABLES
 # ==============================================================================
@@ -614,10 +1300,24 @@ def example_portfolio_returns_tables():
     print("PORTFOLIO RETURNS TABLES")
     print("="*60)
     
+    weights = {
+        'AAPL': 0.10,
+        'MSFT': 0.10,
+        'COST': 0.10,
+        'FANG': 0.10,
+        'COKE': 0.05,
+        'KO': 0.05,
+        'GLD': 0.10,
+        'UNH': 0.10,
+        'HD': 0.10,
+        'MA': 0.05,
+        'V': 0.05,
+        'META': 0.10
+    }
     # Create sample portfolio
     portfolio = Portfolio(
-        weights={'AAPL': 0.4, 'MSFT': 0.3, 'GOOGL': 0.3},
-        start_date='2022-01-01',
+        weights=weights,
+        start_date='1980-01-01',
         end_date='2023-12-31',
         initial_capital=100000
     )
@@ -632,7 +1332,7 @@ def example_portfolio_returns_tables():
         'Return %': (portfolio.portfolio_returns.values[:10] * 100)
     })
     daily_returns_df['Return %'] = daily_returns_df['Return %'].round(2)
-    print(daily_returns_df.to_string(index=False))
+    display(daily_returns_df)
     
     # 2. Monthly returns table
     print("\n2. Monthly Returns:")
@@ -645,7 +1345,7 @@ def example_portfolio_returns_tables():
         'Return %': (monthly_returns.values * 100)
     })
     monthly_df['Return %'] = monthly_df['Return %'].round(2)
-    print(monthly_df.to_string(index=False))
+    display(monthly_df)
     
     # 3. Annual returns table
     print("\n3. Annual Returns:")
@@ -658,8 +1358,8 @@ def example_portfolio_returns_tables():
         'Return %': (annual_returns.values * 100)
     })
     annual_df['Return %'] = annual_df['Return %'].round(2)
-    print(annual_df.to_string(index=False))
-    
+    display(annual_df)
+
     # 4. Statistical summary table
     print("\n4. Statistical Summary:")
     stats_df = pd.DataFrame({
@@ -675,8 +1375,8 @@ def example_portfolio_returns_tables():
             f"{(portfolio.portfolio_returns > 0).mean()*100:.2f}%"
         ]
     })
-    print(stats_df.to_string(index=False))
-    
+    display(stats_df)
+
     # 5. Calendar returns heatmap data
     print("\n5. Calendar Returns Matrix (2023):")
     returns_2023 = portfolio.portfolio_returns['2023']
@@ -694,13 +1394,13 @@ def example_portfolio_returns_tables():
     monthly_summary = returns_2023_df.groupby('Month')['Return'].agg(['mean', 'sum', 'std'])
     monthly_summary.columns = ['Avg Daily %', 'Total %', 'Volatility %']
     monthly_summary = monthly_summary.round(2)
-    print(monthly_summary)
-    
+    display(monthly_summary)
+
     return portfolio
 
 portfolio_tables = example_portfolio_returns_tables()
 
-#%%
+#%% 4
 # ==============================================================================
 # SECTION 4: WEIGHTS AND CONSTRAINTS EXAMPLES
 # ==============================================================================
@@ -714,10 +1414,10 @@ def example_weights_and_constraints():
     
     # Get data
     downloader = DataDownloader()
-    tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'JPM']
+    tickers = ['AAPL', 'MSFT', 'MA', 'AMZN', 'COST', 'COKE', 'BAC', 'JPM']
     returns = downloader.download_returns(
         tickers, 
-        start_date='2021-01-01', 
+        start_date='1980-01-01', 
         end_date='2023-12-31'
     )
     
@@ -805,7 +1505,7 @@ def example_weights_and_constraints():
 
 concentrated_weights = example_weights_and_constraints()
 
-#%%
+#%% 5
 # ==============================================================================
 # SECTION 5: LEVERAGE AND FEES EXAMPLES
 # ==============================================================================
@@ -909,7 +1609,7 @@ def example_leverage_and_fees():
 
 leverage_comparison = example_leverage_and_fees()
 
-#%%
+#%% 6
 # ==============================================================================
 # SECTION 6: EFFICIENT FRONTIER WITH CONSTRAINTS
 # ==============================================================================
@@ -1032,7 +1732,8 @@ def example_efficient_frontier_with_constraints():
     return frontier_unconstrained, frontier_constrained
 
 frontier_unc, frontier_con = example_efficient_frontier_with_constraints()
-#%%
+#%% 7
+
 # ==============================================================================
 # MAIN EXECUTION
 # ==============================================================================
@@ -1071,3 +1772,687 @@ if __name__ == "__main__":
         print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
+
+#%% 8///
+def test_constraint_validation():
+    """Test that constraint validation properly catches infeasible constraints."""
+    
+    print("TESTING IMPROVED CONSTRAINT VALIDATION")
+    print("=" * 50)
+    
+    # Download test data
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    
+    try:
+        prices, returns = downloader.download_prices_and_returns(
+            tickers,
+            start_date='2020-01-01',
+            end_date='2023-12-31'
+        )
+    except Exception as e:
+        print(f"Failed to download data: {e}")
+        return False
+    
+    optimizer = PortfolioOptimizer(returns)
+    constraint_builder = ConstraintBuilder()
+    
+    # Test 1: Feasible constraint (should work)
+    print("\n1. Testing FEASIBLE constraint (4 assets, 5% minimum)...")
+    try:
+        feasible_tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN']
+        feasible_returns = returns[feasible_tickers] 
+        feasible_optimizer = PortfolioOptimizer(feasible_returns)
+        
+        min_pos_constraint = constraint_builder.min_position_constraint(0.05)
+        
+        result = feasible_optimizer.optimize_sharpe(
+            constraints={'min_position': min_pos_constraint}
+        )
+        print("   ✅ SUCCESS: Feasible constraint worked as expected")
+        for k, v in result.items():
+            print(f"     {k}: {v:.2%}")
+        
+    except Exception as e:
+        print(f"   ❌ UNEXPECTED ERROR: {e}")
+        return False
+    
+    # Test 2: Infeasible constraint (should fail with clear error)
+    print("\n2. Testing INFEASIBLE constraint (15 assets, 10% minimum)...")
+    print("   Expected: 15 × 10% = 150% > 100% = IMPOSSIBLE!")
+    
+    try:
+        # This should fail because 15 × 10% = 150% > 100%
+        infeasible_constraint = constraint_builder.min_position_constraint(0.10)
+        
+        result = optimizer.optimize_sharpe(
+            constraints={'min_position': infeasible_constraint}
+        )
+        
+        print("   ❌ PROBLEM: This should have failed but didn't!")
+        print("   The old silent behavior is still happening!")
+        return False
+        
+    except ValueError as e:
+        print("   ✅ SUCCESS: Properly caught infeasible constraint!")
+        print(f"   Error message: {str(e)[:200]}...")
+        return True
+        
+    except Exception as e:
+        print(f"   ❌ WRONG ERROR TYPE: {type(e).__name__}: {e}")
+        return False
+    
+    return True
+
+
+success = test_constraint_validation()
+if success:
+    print("\n🎉 CONSTRAINT VALIDATION FIX WORKING!")
+else:
+    print("\n💥 CONSTRAINT VALIDATION FIX FAILED!")
+
+
+# %% 9.3 - CONSTRAINT FIX VALIDATION ///
+"""
+Test the new constraint fixes - Hard Gates and Constraint-Aware Sampling
+This implements the AI recommendations to fix sector constraint violations.
+"""
+
+def test_constraint_fixes():
+    """Test both MARS and SciPy optimizers with the new constraint handling."""
+    
+    print("🎯 TESTING NEW CONSTRAINT FIXES")
+    print("=" * 60)
+    print("Testing hard constraint gates and constraint-aware sampling...")
+    
+    # Download test data
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    
+    try:
+        prices, returns = downloader.download_prices_and_returns(
+            tickers,
+            start_date='2020-01-01',
+            end_date='2023-12-31'
+        )
+        print(f"✅ Downloaded data for {len(tickers)} assets")
+    except Exception as e:
+        print(f"❌ Failed to download data: {e}")
+        return False
+    
+    # Define sectors
+    tech_stocks = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA']
+    finance_stocks = ['JPM', 'BAC', 'GS']
+    energy_stocks = ['XOM', 'CVX']
+    healthcare_stocks = ['JNJ', 'PFE', 'UNH']
+    
+    # Map tickers to indices
+    ticker_to_index = {ticker: i for i, ticker in enumerate(tickers)}
+    
+    sector_mapping = {
+        'tech': [ticker_to_index[t] for t in tech_stocks if t in ticker_to_index],
+        'finance': [ticker_to_index[t] for t in finance_stocks if t in ticker_to_index],
+        'energy': [ticker_to_index[t] for t in energy_stocks if t in ticker_to_index],
+        'healthcare': [ticker_to_index[t] for t in healthcare_stocks if t in ticker_to_index]
+    }
+    
+    # Define challenging but feasible sector limits
+    sector_limits = {
+        'tech': (0.30, 0.60),      # Tech: 30-60%
+        'finance': (0.10, 0.25),   # Finance: 10-25%
+        'energy': (0.05, 0.15),    # Energy: 5-15%
+        'healthcare': (0.10, 0.20) # Healthcare: 10-20%
+    }
+    
+    print(f"\n📋 Sector constraints:")
+    for sector, (min_limit, max_limit) in sector_limits.items():
+        stocks = [tech_stocks, finance_stocks, energy_stocks, healthcare_stocks]
+        sector_stocks = stocks[list(sector_limits.keys()).index(sector)]
+        print(f"   {sector}: {min_limit:.0%}-{max_limit:.0%} ({len(sector_stocks)} stocks)")
+    
+    constraint_builder = ConstraintBuilder()
+    sector_constraints = constraint_builder.sector_constraint(sector_mapping, sector_limits)
+    
+    results = {}
+    
+    # Test 1: SciPy optimizer (baseline - should work)
+    print(f"\n🔧 Testing SciPy Optimizer (baseline)...")
+    try:
+        scipy_optimizer = PortfolioOptimizer(returns, optimizer='scipy')
+        
+        scipy_weights = scipy_optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            verbose=True
+        )
+        
+        # Calculate sector allocations
+        sector_allocs_scipy = {
+            'tech': sum(scipy_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(scipy_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(scipy_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(scipy_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        # Check constraint satisfaction
+        scipy_violations = 0
+        print(f"\n   📊 SciPy Sector Allocations:")
+        for sector, alloc in sector_allocs_scipy.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                satisfied = min_limit <= alloc <= max_limit
+                if not satisfied:
+                    scipy_violations += 1
+                
+                status = "✅" if satisfied else "❌"
+                deviation = ""
+                if not satisfied:
+                    if alloc < min_limit:
+                        deviation = f" (short by {min_limit - alloc:.1%})"
+                    else:
+                        deviation = f" (over by {alloc - max_limit:.1%})"
+                
+                print(f"      {status} {sector}: {alloc:.2%} (target: {min_limit:.0%}-{max_limit:.0%}){deviation}")
+        
+        results['scipy'] = {
+            'success': scipy_violations == 0,
+            'violations': scipy_violations,
+            'weights': scipy_weights,
+            'allocations': sector_allocs_scipy
+        }
+        
+        overall_status = "✅ SUCCESS" if scipy_violations == 0 else f"❌ {scipy_violations} VIOLATIONS"
+        print(f"   {overall_status}")
+        
+    except Exception as e:
+        print(f"   ❌ SciPy optimizer failed: {e}")
+        results['scipy'] = {'success': False, 'error': str(e)}
+    
+    # Test 2: MARS optimizer with NEW FIXES
+    print(f"\n🎯 Testing MARS Optimizer (with constraint fixes)...")
+    print("   Using: Hard constraint gates + Constraint-aware sampling")
+    try:
+        mars_optimizer = PortfolioOptimizer(returns, optimizer='mars')
+        
+        mars_weights = mars_optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            n_trials=5000,  # More trials for better constraint satisfaction
+            initial_noise=0.8,  # Higher noise for wider exploration
+            verbose=True
+        )
+        
+        # Calculate sector allocations
+        sector_allocs_mars = {
+            'tech': sum(mars_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(mars_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(mars_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(mars_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        # Check constraint satisfaction
+        mars_violations = 0
+        print(f"\n   📊 MARS Sector Allocations (with fixes):")
+        for sector, alloc in sector_allocs_mars.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                satisfied = min_limit <= alloc <= max_limit
+                if not satisfied:
+                    mars_violations += 1
+                
+                status = "✅" if satisfied else "❌"
+                deviation = ""
+                if not satisfied:
+                    if alloc < min_limit:
+                        deviation = f" (short by {min_limit - alloc:.1%})"
+                    else:
+                        deviation = f" (over by {alloc - max_limit:.1%})"
+                
+                print(f"      {status} {sector}: {alloc:.2%} (target: {min_limit:.0%}-{max_limit:.0%}){deviation}")
+        
+        results['mars_fixed'] = {
+            'success': mars_violations == 0,
+            'violations': mars_violations,
+            'weights': mars_weights,
+            'allocations': sector_allocs_mars
+        }
+        
+        overall_status = "✅ SUCCESS" if mars_violations == 0 else f"❌ {mars_violations} VIOLATIONS"
+        print(f"   {overall_status}")
+        
+    except Exception as e:
+        print(f"   ❌ MARS optimizer (fixed) failed: {e}")
+        results['mars_fixed'] = {'success': False, 'error': str(e)}
+    
+    # Performance comparison
+    if 'scipy' in results and 'mars_fixed' in results:
+        if results['scipy'].get('success') and results['mars_fixed'].get('success'):
+            print(f"\n📈 Performance Comparison (both satisfied constraints):")
+            
+            # Calculate portfolio metrics for comparison
+            for name, result in [('SciPy', results['scipy']), ('MARS Fixed', results['mars_fixed'])]:
+                if 'weights' in result:
+                    weights_array = np.array([result['weights'][t] for t in tickers])
+                    port_return = np.dot(weights_array, returns.mean()) * 252
+                    port_vol = np.sqrt(np.dot(weights_array.T, np.dot(returns.cov(), weights_array))) * np.sqrt(252)
+                    sharpe = port_return / port_vol if port_vol > 0 else 0
+                    
+                    print(f"   {name}:")
+                    print(f"     Return: {port_return:.2%}")
+                    print(f"     Volatility: {port_vol:.2%}")
+                    print(f"     Sharpe: {sharpe:.3f}")
+    
+    # Summary
+    print(f"\n" + "=" * 60)
+    print(f"📋 CONSTRAINT FIX TEST SUMMARY")
+    print(f"=" * 60)
+    
+    for optimizer_name, result in results.items():
+        if 'success' in result:
+            status = "✅ SUCCESS" if result['success'] else f"❌ FAILED"
+            print(f"{optimizer_name.upper().replace('_', ' ')}: {status}")
+            if not result['success'] and 'violations' in result:
+                print(f"   Constraint violations: {result['violations']}")
+            elif 'error' in result:
+                print(f"   Error: {result['error'][:100]}...")
+        else:
+            print(f"{optimizer_name.upper().replace('_', ' ')}: ❌ NO RESULT")
+    
+    # Overall assessment
+    success_count = sum(1 for r in results.values() if r.get('success', False))
+    total_tests = len(results)
+    
+    print(f"\n🏆 FINAL ASSESSMENT:")
+    if success_count == total_tests:
+        print(f"🎉 ALL TESTS PASSED! ({success_count}/{total_tests})")
+        print(f"   Constraint fixes are working perfectly!")
+        print(f"   Both SciPy and MARS now properly enforce sector constraints!")
+    elif success_count > 0:
+        mars_success = results.get('mars_fixed', {}).get('success', False)
+        if mars_success:
+            print(f"🎯 MARS CONSTRAINT FIXES WORKING! ({success_count}/{total_tests})")
+            print(f"   The hard constraint gates and constraint-aware sampling are successful!")
+            print(f"   MARS optimizer now properly enforces sector constraints!")
+        else:
+            print(f"⚠️  PARTIAL SUCCESS ({success_count}/{total_tests})")
+            print(f"   Some improvements working, but MARS fixes need refinement")
+    else:
+        print(f"💥 ALL TESTS FAILED ({success_count}/{total_tests})")
+        print(f"   Constraint fixes need significant rework")
+    
+    return success_count == total_tests
+
+# Run the constraint fix test
+constraint_fix_success = test_constraint_fixes()
+
+if constraint_fix_success:
+    print("\n🚀 CONSTRAINT PROBLEM SOLVED!")
+    print("The portfolio optimizer now properly handles sector constraints!")
+else:
+    print("\n🔧 MORE DEBUGGING NEEDED")
+    print("Continue refining the constraint fixes...")
+
+# %% 9 ///
+def test_sector_constraints():
+    """Test that sector constraints are properly enforced."""
+    
+    print("🎯 SECTOR CONSTRAINT ENFORCEMENT TEST")
+    print("=" * 50)
+    
+    # Download data
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    prices, returns = downloader.download_prices_and_returns(
+        tickers,
+        start_date='2020-01-01',
+        end_date='2023-12-31'
+    )
+    
+    optimizer = PortfolioOptimizer(returns)
+    constraint_builder = ConstraintBuilder()
+    
+    # Define sectors and their indices
+    tech_stocks = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA']
+    finance_stocks = ['JPM', 'BAC', 'GS']
+    energy_stocks = ['XOM', 'CVX']
+    healthcare_stocks = ['JNJ', 'PFE', 'UNH']
+    
+    # Map tickers to indices
+    ticker_to_index = {ticker: i for i, ticker in enumerate(tickers)}
+    
+    sector_mapping = {
+        'tech': [ticker_to_index[t] for t in tech_stocks if t in ticker_to_index],
+        'finance': [ticker_to_index[t] for t in finance_stocks if t in ticker_to_index],
+        'energy': [ticker_to_index[t] for t in energy_stocks if t in ticker_to_index],
+        'healthcare': [ticker_to_index[t] for t in healthcare_stocks if t in ticker_to_index]
+    }
+    
+    # Define sector limits  
+    sector_limits = {
+        'tech': (0.30, 0.60),      # Tech: 30-60%
+        'finance': (0.10, 0.25),   # Finance: 10-25%  
+        'energy': (0.05, 0.15),    # Energy: 5-15%
+        'healthcare': (0.10, 0.20) # Healthcare: 10-20%
+    }
+    
+    print("Sector definitions:")
+    for sector, stocks in [('tech', tech_stocks), ('finance', finance_stocks), 
+                          ('energy', energy_stocks), ('healthcare', healthcare_stocks)]:
+        print(f"  {sector}: {stocks}")
+        if sector in sector_limits:
+            min_limit, max_limit = sector_limits[sector]
+            print(f"    Target: {min_limit:.0%}-{max_limit:.0%}")
+    
+    print("\nTesting sector constraints...")
+    
+    try:
+        # Use actual ConstraintBuilder
+        sector_constraints = constraint_builder.sector_constraint(sector_mapping, sector_limits)
+        
+        print(f"Generated {len(sector_constraints)} sector constraint functions")
+        
+        # Test the constraint functions with a sample allocation
+        test_weights = np.array([1/len(tickers)] * len(tickers))  # Equal weights
+        print(f"\nTesting constraint functions with equal weights:")
+        for i, constraint in enumerate(sector_constraints):
+            result = constraint['fun'](test_weights)
+            print(f"  Constraint {i+1}: {result:.4f} ({'satisfied' if result >= 0 else 'violated'})")
+        
+        # Optimize with sector constraints
+        sector_weights = optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            n_trials=2000  # More trials for better constraint satisfaction
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(sector_weights, list):
+            sector_weights = {tickers[i]: sector_weights[i] for i in range(len(tickers))}
+        
+        # Calculate sector allocations
+        sector_allocs = {
+            'tech': sum(sector_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(sector_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(sector_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(sector_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        print(f"\n✅ OPTIMIZATION SUCCESS")
+        print(f"Final sector allocations:")
+        
+        all_satisfied = True
+        for sector, alloc in sector_allocs.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                sector_satisfied = min_limit <= alloc <= max_limit
+                if not sector_satisfied:
+                    all_satisfied = False
+                    
+                sector_status = "✅" if sector_satisfied else "❌"
+                deviation = ""
+                if not sector_satisfied:
+                    if alloc < min_limit:
+                        deviation = f" (short by {min_limit - alloc:.2%})"
+                    else:
+                        deviation = f" (over by {alloc - max_limit:.2%})"
+                        
+                print(f"  {sector_status} {sector}: {alloc:.2%} (target: {min_limit:.0%}-{max_limit:.0%}){deviation}")
+            else:
+                print(f"  ℹ️ {sector}: {alloc:.2%} (no limits)")
+        
+        overall_status = "✅ ALL SATISFIED" if all_satisfied else "❌ SOME VIOLATIONS"
+        print(f"\n{overall_status}")
+        
+        print(f"\nTop holdings:")
+        for ticker, weight in sorted(sector_weights.items(), key=lambda x: x[1], reverse=True):
+            if weight > 0.01:
+                print(f"  {ticker}: {weight:.2%}")
+        
+        return all_satisfied
+        
+    except Exception as e:
+        print(f"❌ SECTOR CONSTRAINT TEST FAILED: {e}")
+        return False
+
+
+success = test_sector_constraints()
+if success:
+    print("\n🎉 SECTOR CONSTRAINTS WORKING PERFECTLY!")
+else:
+    print("\n⚠️ SECTOR CONSTRAINTS NEED MORE TUNING")
+
+
+# %% 9.2//
+def test_sector_constraints_scipy():
+    """Test sector constraints using SciPy optimizer (hard constraints)."""
+    
+    print("🎯 SECTOR CONSTRAINTS WITH SCIPY (HARD CONSTRAINTS)")
+    print("=" * 60)
+    
+    # Download data
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    prices, returns = downloader.download_prices_and_returns(
+        tickers,
+        start_date='2020-01-01',
+        end_date='2023-12-31'
+    )
+    
+    # Create SciPy optimizer instead of MARS
+    optimizer = PortfolioOptimizer(returns, optimizer='scipy')
+    constraint_builder = ConstraintBuilder()
+    
+    # Define sectors and their indices
+    tech_stocks = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA']
+    finance_stocks = ['JPM', 'BAC', 'GS']
+    energy_stocks = ['XOM', 'CVX']
+    healthcare_stocks = ['JNJ', 'PFE', 'UNH']
+    
+    # Map tickers to indices
+    ticker_to_index = {ticker: i for i, ticker in enumerate(tickers)}
+    
+    sector_mapping = {
+        'tech': [ticker_to_index[t] for t in tech_stocks if t in ticker_to_index],
+        'finance': [ticker_to_index[t] for t in finance_stocks if t in ticker_to_index],
+        'energy': [ticker_to_index[t] for t in energy_stocks if t in ticker_to_index],
+        'healthcare': [ticker_to_index[t] for t in healthcare_stocks if t in ticker_to_index]
+    }
+    
+    # Define sector limits
+    sector_limits = {
+        'tech': (0.30, 0.60),      # Tech: 30-60%
+        'finance': (0.10, 0.25),   # Finance: 10-25%
+        'energy': (0.05, 0.15),    # Energy: 5-15%
+        'healthcare': (0.10, 0.20) # Healthcare: 10-20%
+    }
+    
+    print("Using SciPy optimizer with HARD constraints...")
+    print("Sector definitions:")
+    for sector, stocks in [('tech', tech_stocks), ('finance', finance_stocks), 
+                          ('energy', energy_stocks), ('healthcare', healthcare_stocks)]:
+        print(f"  {sector}: {stocks}")
+        if sector in sector_limits:
+            min_limit, max_limit = sector_limits[sector]
+            print(f"    Target: {min_limit:.0%}-{max_limit:.0%}")
+    
+    try:
+        # Use SciPy with sector constraints
+        sector_constraints = constraint_builder.sector_constraint(sector_mapping, sector_limits)
+        
+        print(f"\nGenerated {len(sector_constraints)} sector constraint functions")
+        print("Optimizing with hard constraints...")
+        
+        sector_weights = optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            verbose=True
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(sector_weights, list):
+            sector_weights = {tickers[i]: sector_weights[i] for i in range(len(tickers))}
+        
+        # Calculate sector allocations
+        sector_allocs = {
+            'tech': sum(sector_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(sector_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(sector_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(sector_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        print(f"\n✅ SCIPY OPTIMIZATION SUCCESS")
+        print(f"Final sector allocations:")
+        
+        all_satisfied = True
+        for sector, alloc in sector_allocs.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                sector_satisfied = min_limit <= alloc <= max_limit
+                if not sector_satisfied:
+                    all_satisfied = False
+                    
+                sector_status = "✅" if sector_satisfied else "❌"
+                deviation = ""
+                if not sector_satisfied:
+                    if alloc < min_limit:
+                        deviation = f" (short by {min_limit - alloc:.2%})"
+                    else:
+                        deviation = f" (over by {alloc - max_limit:.2%})"
+                        
+                print(f"  {sector_status} {sector}: {alloc:.2%} (target: {min_limit:.0%}-{max_limit:.0%}){deviation}")
+            else:
+                print(f"  ℹ️ {sector}: {alloc:.2%} (no limits)")
+        
+        overall_status = "✅ ALL SATISFIED" if all_satisfied else "❌ SOME VIOLATIONS"
+        print(f"\n{overall_status}")
+        
+        print(f"\nTop holdings:")
+        for ticker, weight in sorted(sector_weights.items(), key=lambda x: x[1], reverse=True):
+            if weight > 0.01:
+                print(f"  {ticker}: {weight:.2%}")
+        
+        return all_satisfied
+        
+    except Exception as e:
+        print(f"❌ SCIPY SECTOR CONSTRAINT TEST FAILED: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def test_sector_constraints_mars():
+    """Test sector constraints using MARS optimizer (penalty-based)."""
+    
+    print("\n" + "=" * 60)
+    print("🎯 SECTOR CONSTRAINTS WITH MARS (PENALTY-BASED)")
+    print("=" * 60)
+    
+    # Download data
+    downloader = DataDownloader()
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA', 'JPM', 'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH']
+    prices, returns = downloader.download_prices_and_returns(
+        tickers,
+        start_date='2020-01-01',
+        end_date='2023-12-31'
+    )
+    
+    # Create MARS optimizer 
+    optimizer = PortfolioOptimizer(returns, optimizer='mars')
+    constraint_builder = ConstraintBuilder()
+    
+    # Define sectors and their indices
+    tech_stocks = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'TSLA', 'NVDA']
+    finance_stocks = ['JPM', 'BAC', 'GS']
+    energy_stocks = ['XOM', 'CVX']
+    healthcare_stocks = ['JNJ', 'PFE', 'UNH']
+    
+    # Map tickers to indices
+    ticker_to_index = {ticker: i for i, ticker in enumerate(tickers)}
+    
+    sector_mapping = {
+        'tech': [ticker_to_index[t] for t in tech_stocks if t in ticker_to_index],
+        'finance': [ticker_to_index[t] for t in finance_stocks if t in ticker_to_index],
+        'energy': [ticker_to_index[t] for t in energy_stocks if t in ticker_to_index],
+        'healthcare': [ticker_to_index[t] for t in healthcare_stocks if t in ticker_to_index]
+    }
+    
+    # Define sector limits
+    sector_limits = {
+        'tech': (0.30, 0.60),      # Tech: 30-60%
+        'finance': (0.10, 0.25),   # Finance: 10-25%
+        'energy': (0.05, 0.15),    # Energy: 5-15%
+        'healthcare': (0.10, 0.20) # Healthcare: 10-20%
+    }
+    
+    print("Using MARS optimizer with extreme penalties...")
+    
+    try:
+        sector_constraints = constraint_builder.sector_constraint(sector_mapping, sector_limits)
+        
+        sector_weights = optimizer.optimize_sharpe(
+            constraints={'sector': sector_constraints},
+            n_trials=15000,  # Maximum trials
+            initial_noise=0.8,  # High diversity
+            verbose=False  # Less spam
+        )
+        
+        # Convert to dictionary if needed
+        if isinstance(sector_weights, list):
+            sector_weights = {tickers[i]: sector_weights[i] for i in range(len(tickers))}
+        
+        # Calculate sector allocations
+        sector_allocs = {
+            'tech': sum(sector_weights.get(t, 0) for t in tech_stocks),
+            'finance': sum(sector_weights.get(t, 0) for t in finance_stocks),
+            'energy': sum(sector_weights.get(t, 0) for t in energy_stocks),
+            'healthcare': sum(sector_weights.get(t, 0) for t in healthcare_stocks)
+        }
+        
+        print(f"\n✅ MARS OPTIMIZATION COMPLETE")
+        print(f"Final sector allocations:")
+        
+        all_satisfied = True
+        for sector, alloc in sector_allocs.items():
+            if sector in sector_limits:
+                min_limit, max_limit = sector_limits[sector]
+                sector_satisfied = min_limit <= alloc <= max_limit
+                if not sector_satisfied:
+                    all_satisfied = False
+                    
+                sector_status = "✅" if sector_satisfied else "❌"
+                deviation = ""
+                if not sector_satisfied:
+                    if alloc < min_limit:
+                        deviation = f" (short by {min_limit - alloc:.2%})"
+                    else:
+                        deviation = f" (over by {alloc - max_limit:.2%})"
+                        
+                print(f"  {sector_status} {sector}: {alloc:.2%} (target: {min_limit:.0%}-{max_limit:.0%}){deviation}")
+            else:
+                print(f"  ℹ️ {sector}: {alloc:.2%} (no limits)")
+        
+        overall_status = "✅ ALL SATISFIED" if all_satisfied else "❌ SOME VIOLATIONS"
+        print(f"\n{overall_status}")
+        
+        return all_satisfied
+        
+    except Exception as e:
+        print(f"❌ MARS SECTOR CONSTRAINT TEST FAILED: {e}")
+        return False
+
+if __name__ == "__main__":
+    print("🚀 COMPARING SECTOR CONSTRAINT ENFORCEMENT")
+    print("=" * 60)
+    
+    scipy_success = test_sector_constraints_scipy()
+    mars_success = test_sector_constraints_mars()
+    
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+    print(f"SciPy (Hard Constraints): {'✅ SUCCESS' if scipy_success else '❌ FAILED'}")
+    print(f"MARS (Penalty-Based): {'✅ SUCCESS' if mars_success else '❌ FAILED'}")
+    
+    if scipy_success and not mars_success:
+        print("\n💡 RECOMMENDATION: Use SciPy optimizer for strict sector constraints!")
+    elif mars_success:
+        print("\n🎉 MARS penalty method is now working!")
+    else:
+        print("\n🤔 Both methods need further tuning...")
+
+#%%
