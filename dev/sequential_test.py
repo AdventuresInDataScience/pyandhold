@@ -16,7 +16,7 @@ from pyandhold.optimization import RobustOptimizer, ConstraintBuilder
 from pyandhold.portfolio import Backtester
 from pyandhold.data import StockUniverse, DataPreprocessor
 from pyandhold.visualization import PortfolioVisualizer
-from pyandhold.utils import PortfolioHelpers
+from pyandhold.utils import PortfolioHelpers, Summariser
 from pyandhold.metrics import ReturnMetrics, RiskMetrics, PerformanceMetrics
 
 #%% 1
@@ -2129,3 +2129,63 @@ def test_optimal(weights):
 
 # %%
 test_optimal(optimized_weights)
+
+#%% testing helper
+# CONFIG
+tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'JPM',
+            'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH', 'DIS', 'CURE',
+            'NFLX', 'INTC', 'CSCO', 'CMCSA', 'PEP', 'KO', 'MRK', 'ABT',
+            'COKE', 'WMT', 'T', 'VZ', 'HD', 'LOW', 'MA', 'V', 'SPY', 'ADBE',
+            'COST', 'CRM', 'ORCL', 'IBM', 'QCOM', 'TXN', 'AMD', 'SBUX', 'MCD',
+             'TQQQ', 'SOXL', 'TPL', 'M']
+
+start_date='1980-01-01'
+end_date='2025-12-31'
+
+max_weight_limit = 0.3  # 30% max
+min_weight_limit = 0.0  # 0% min
+max_volatility = 0.9  # 90% maximum volatility constraint
+
+initial_capital=100000
+
+# Download data first
+downloader = DataDownloader()
+prices, returns = downloader.download_prices_and_returns(
+    tickers=tickers,
+    start_date=start_date,
+    end_date=end_date
+)
+
+# Initialize optimizer with the returns data
+optimizer = PortfolioOptimizer(returns)
+
+# Initialize summarizer with common parameters
+summariser = Summariser(
+    start_date='2010-01-01',
+    end_date='2023-12-31',
+    rebalance_frequency='Q',
+    initial_capital=100000,
+    benchmark='SPY'
+)
+
+# Get optimized weights from different strategies
+equal_weights = {ticker: 1/len(tickers) for ticker in tickers}
+sharpe_weights = optimizer.optimize_sharpe()
+minvar_weights = optimizer.optimize_min_variance()
+rp_weights = optimizer.optimize_risk_parity()
+
+# Add portfolios to the summariser
+summariser.add_portfolio('Equal Weight', equal_weights)
+summariser.add_portfolio('Max Sharpe', sharpe_weights)
+summariser.add_portfolio('Min Variance', minvar_weights)
+summariser.add_portfolio('Risk Parity', rp_weights)
+
+# Display summary comparison
+summariser.show_summary()
+
+# Show specific metrics only
+summariser.show_summary(['total_return', 'sharpe_ratio', 'max_drawdown'])
+
+# Plot drawdown comparison separately
+summariser.plot_drawdown_comparison()
+# %%
