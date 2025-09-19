@@ -181,3 +181,93 @@ class RobustOptimizer:
             return optimizer.optimize_min_variance(**optimization_kwargs)
         else:
             raise ValueError(f"Unknown optimization method: {optimization_method}")
+    
+    def black_litterman_optimization(
+        self,
+        market_caps: pd.Series,
+        views: Dict[str, float],
+        view_confidences: Dict[str, float],
+        tau: float = 0.1,
+        risk_aversion: float = 3.0,
+        **optimization_kwargs
+    ) -> Dict[str, float]:
+        """
+        Black-Litterman optimization with views.
+        
+        Args:
+            market_caps: Market capitalizations for assets
+            views: Dictionary of views {asset: expected_return}
+            view_confidences: Dictionary of view confidences {asset: confidence}
+            tau: Uncertainty parameter (typically 0.01 to 1.0)
+            risk_aversion: Risk aversion parameter
+            **optimization_kwargs: Additional optimization arguments
+            
+        Returns:
+            Dictionary of optimal weights
+        """
+        # Market weights (proportional to market cap)
+        w_market = market_caps / market_caps.sum()
+        
+        # Sample covariance matrix
+        cov_matrix = self.returns.cov().values
+        
+        # Implied returns (reverse optimization)
+        pi = risk_aversion * np.dot(cov_matrix, w_market.values)
+        
+        # Create view matrix P and view returns Q
+        n_assets = len(self.returns.columns)
+        view_assets = list(views.keys())
+        n_views = len(view_assets)
+        
+        P = np.zeros((n_views, n_assets))
+        Q = np.zeros(n_views)
+        omega_diag = np.zeros(n_views)
+        
+        for i, asset in enumerate(view_assets):
+            asset_idx = list(self.returns.columns).index(asset)
+            P[i, asset_idx] = 1.0
+            Q[i] = views[asset]
+            # View uncertainty (inverse of confidence)
+            omega_diag[i] = 1.0 / view_confidences[asset]
+        
+        omega = np.diag(omega_diag)
+        
+        # Black-Litterman formula
+        tau_cov = tau * cov_matrix
+        
+        # New expected returns
+        M1 = np.linalg.inv(tau_cov)
+        M2 = np.dot(P.T, np.dot(np.linalg.inv(omega), P))
+        M3 = np.dot(np.linalg.inv(tau_cov), pi)
+        M4 = np.dot(P.T, np.dot(np.linalg.inv(omega), Q))
+        
+        mu_bl = np.dot(np.linalg.inv(M1 + M2), M3 + M4)
+        
+        # New covariance matrix
+        cov_bl = np.linalg.inv(M1 + M2)
+        
+        # Create modified returns with BL parameters
+        # Generate synthetic returns that match BL statistics
+        np.random.seed(42)
+        n_samples = len(self.returns)
+        synthetic_returns = np.random.multivariate_normal(
+            mu_bl / self.periods_per_year,  # Daily returns
+            cov_bl / self.periods_per_year,  # Daily covariance
+            n_samples
+        )
+        
+        bl_returns = pd.DataFrame(
+            synthetic_returns,
+            columns=self.returns.columns,
+            index=self.returns.index
+        )
+        
+        # Optimize using Black-Litterman inputs
+        optimizer = PortfolioOptimizer(
+            bl_returns,
+            self.risk_free_rate,
+            self.periods_per_year
+        )
+        
+        # Use Sharpe optimization as default
+        return optimizer.optimize_sharpe(**optimization_kwargs)
