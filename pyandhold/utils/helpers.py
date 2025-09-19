@@ -1,12 +1,26 @@
 """Utility functions for PyAndHold portfolio optimization."""
 
+"""Utility functions for PyAndHold portfolio optimization."""
+
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Union, Optional
 from scipy.stats import norm, t
 import warnings
 
+from ..data.downloader import DataDownloader
+from ..data.preprocessor import DataPreprocessor
+from ..data.universe import StockUniverse
+from ..metrics.returns import ReturnMetrics
+from ..metrics.risk import RiskMetrics
+from ..metrics.performance import PerformanceMetrics
+from ..portfolio.portfolio import Portfolio
+from ..portfolio.backtester import Backtester
 
+from ..optimization.optimizers import PortfolioOptimizer
+from ..optimization.constraints import ConstraintBuilder
+from ..optimization.robust import RobustOptimizer
+from ..visualization import PortfolioVisualizer
 class PortfolioHelpers:
     """Helper functions for portfolio analysis."""
     
@@ -227,3 +241,56 @@ class PortfolioHelpers:
         portfolio_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
         
         return weighted_avg_vol / portfolio_vol
+    
+class Summariser:
+        pass  # Placeholder for summariser methods
+
+    # get_optimized_weights
+    # Config
+tickers = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'JPM',
+            'BAC', 'GS', 'XOM', 'CVX', 'JNJ', 'PFE', 'UNH', 'DIS', 'CURE',
+            'NFLX', 'INTC', 'CSCO', 'CMCSA', 'PEP', 'KO', 'MRK', 'ABT',
+            'COKE', 'WMT', 'T', 'VZ', 'HD', 'LOW', 'MA', 'V', 'SPY', 'ADBE',
+            'COST', 'CRM', 'ORCL', 'IBM', 'QCOM', 'TXN', 'AMD', 'SBUX', 'MCD',
+             'TQQQ', 'SOXL', 'TPL', 'M']
+
+start_date='1980-01-01'
+end_date='2025-12-31'
+
+max_weight_limit = 0.3  # 30% max
+min_weight_limit = 0.0  # 0% min
+max_volatility = 0.9  # 90% maximum volatility constraint
+
+initial_capital=100000
+
+# Download data for constraint testing
+downloader = DataDownloader()
+prices, returns = downloader.download_prices_and_returns(
+    tickers=tickers,
+    start_date=start_date,
+    end_date=end_date
+)
+
+# Optimize with constraints
+optimizer = PortfolioOptimizer(returns)
+constraint_portfolios = {}
+constraint_builder = ConstraintBuilder()
+
+max_pos_constraint = constraint_builder.max_position_constraint(max_weight_limit) # MAX AND MIN POSITION example 
+min_pos_constraint = constraint_builder.min_position_constraint(min_weight_limit)
+
+# Combine both constraints
+combined_constraints = {
+    'max_position': max_pos_constraint,
+    'min_position': min_pos_constraint
+}
+
+# Use optimize_max_return with required max_volatility parameter
+optimized_weights = optimizer.optimize_max_return(
+    max_volatility=max_volatility,
+    constraints=combined_constraints
+)
+
+# add_portfolio
+
+# show_summary
