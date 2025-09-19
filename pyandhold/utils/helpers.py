@@ -8,6 +8,13 @@ from typing import List, Dict, Union, Optional
 from scipy.stats import norm, t
 import warnings
 
+try:
+    from IPython.display import display
+except ImportError:
+    # Fallback for non-Jupyter environments
+    def display(obj):
+        print(obj)
+
 from ..data.downloader import DataDownloader
 from ..data.preprocessor import DataPreprocessor
 from ..data.universe import StockUniverse
@@ -20,7 +27,7 @@ from ..portfolio.backtester import Backtester
 from ..optimization.optimizers import PortfolioOptimizer
 from ..optimization.constraints import ConstraintBuilder
 from ..optimization.robust import RobustOptimizer
-from ..visualization import PortfolioVisualizer
+from ..visualization.plots import PortfolioVisualizer
 class PortfolioHelpers:
     """Helper functions for portfolio analysis."""
     
@@ -665,8 +672,9 @@ class Summariser:
             portfolio_values[name] = portfolio.calculate_portfolio_value()
             
         visualizer = PortfolioVisualizer()
-        fig = visualizer.plot_comparative_performance(
+        fig = visualizer.plot_multiple_portfolios_comparison(
             portfolio_values,
+            chart_type="performance",
             title="Portfolio Performance Comparison"
         )
         fig.show()
@@ -681,8 +689,9 @@ class Summariser:
             portfolio_values[name] = portfolio.calculate_portfolio_value()
             
         visualizer = PortfolioVisualizer()
-        fig = visualizer.plot_comparative_drawdowns(
+        fig = visualizer.plot_multiple_portfolios_comparison(
             portfolio_values,
+            chart_type="drawdown",
             title="Portfolio Drawdown Comparison"
         )
         fig.show()
