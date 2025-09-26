@@ -54,6 +54,43 @@ class ConstraintBuilder:
         }
     
     @staticmethod
+    def regularized_min_position_constraint(min_weight: float, threshold: float = 1e-6):
+        """
+        Regularized minimum weight constraint: enforces either 0% or minimum weight.
+        
+        This constraint prevents small, potentially overfitted positions by forcing
+        weights to be either zero or at least the minimum threshold.
+        
+        Args:
+            min_weight: Minimum weight for active positions
+            threshold: Threshold below which positions are considered zero
+            
+        Returns:
+            Constraint dictionary for optimization
+        """
+        def make_constraint(i):
+            def constraint_func(x):
+                weight = x[i]
+                # If weight is above threshold, enforce minimum
+                if weight > threshold:
+                    return weight - min_weight
+                # If weight is below threshold, enforce it to be exactly zero (or very small)
+                else:
+                    return threshold - weight  # Forces weight <= threshold
+            
+            return {
+                'type': 'ineq',
+                'fun': constraint_func
+            }
+        
+        return {
+            'type': 'regularized_min_position',
+            'min_weight': min_weight,
+            'threshold': threshold,
+            'constraint_generator': make_constraint
+        }
+    
+    @staticmethod
     def sector_constraint(
         sector_mapping: Dict[str, List[int]],
         sector_limits: Dict[str, Tuple[float, float]]

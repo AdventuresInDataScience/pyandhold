@@ -782,6 +782,13 @@ class PortfolioOptimizer:
                         for w in weights:
                             if w > threshold and w < min_weight - tolerance:
                                 return False
+                    elif constraint_type == 'regularized_min_position':
+                        min_weight = constraint['min_weight']
+                        threshold = constraint.get('threshold', 1e-6)
+                        for w in weights:
+                            # Regularized constraint: weight must be either <= threshold or >= min_weight
+                            if w > threshold and w < min_weight - tolerance:
+                                return False
                 else:
                     # Single constraint
                     try:
@@ -954,6 +961,10 @@ class PortfolioOptimizer:
                                 constraints_list.append(constraint['constraint_generator'](i))
                         elif constraint.get('type') == 'min_position':
                             # Generate individual constraints for each position
+                            for i in range(self.n_assets):
+                                constraints_list.append(constraint['constraint_generator'](i))
+                        elif constraint.get('type') == 'regularized_min_position':
+                            # Generate individual regularized constraints for each position
                             for i in range(self.n_assets):
                                 constraints_list.append(constraint['constraint_generator'](i))
                         else:
@@ -1550,6 +1561,8 @@ class PortfolioOptimizer:
                     self._validate_min_position_constraint(constraint, weight_bounds, verbose)
                 elif constraint_type == 'max_position':
                     self._validate_max_position_constraint(constraint, weight_bounds, verbose)
+                elif constraint_type == 'regularized_min_position':
+                    self._validate_regularized_min_position_constraint(constraint, weight_bounds, verbose)
     
     def _validate_min_position_constraint(
         self, 
@@ -1667,6 +1680,70 @@ class PortfolioOptimizer:
         if verbose:
             print(f"  ✓ Maximum position constraint is feasible")
             print(f"    Maximum total allocation: {max_possible_allocation:.1%}")
+
+    def _validate_regularized_min_position_constraint(
+        self, 
+        constraint: Dict, 
+        weight_bounds: Tuple[float, float], 
+        verbose: bool = False
+    ) -> None:
+        """
+        Validate regularized minimum position constraint for feasibility.
+        
+        This constraint enforces either 0% or minimum weight, which helps avoid
+        small overfitted positions.
+        
+        Args:
+            constraint: Regularized min position constraint dictionary
+            weight_bounds: Weight bounds for validation
+            verbose: Print validation details
+            
+        Raises:
+            ValueError: If regularized minimum position constraint is infeasible
+        """
+        min_weight = constraint['min_weight']
+        threshold = constraint.get('threshold', 1e-6)
+        
+        if verbose:
+            print(f"\nValidating regularized minimum position constraint:")
+            print(f"  Required minimum weight (if active): {min_weight:.1%}")
+            print(f"  Zero threshold: {threshold:.8f}")
+            print(f"  Number of assets: {self.n_assets}")
+            print(f"  Weight bounds: {weight_bounds}")
+        
+        # Check basic feasibility
+        if min_weight > weight_bounds[1]:
+            raise ValueError(
+                f"Infeasible regularized minimum position constraint: "
+                f"Required minimum weight {min_weight:.1%} exceeds maximum allowed weight {weight_bounds[1]:.1%}"
+            )
+        
+        if min_weight < weight_bounds[0]:
+            if verbose:
+                print(f"  Warning: Minimum weight {min_weight:.1%} is below lower bound {weight_bounds[0]:.1%}")
+        
+        # Check if equal weighting is feasible
+        equal_weight = 1.0 / self.n_assets
+        
+        if equal_weight >= min_weight:
+            # Equal weighting satisfies the constraint for all assets
+            if verbose:
+                print(f"  ✓ Equal weighting ({equal_weight:.3%}) satisfies constraint")
+        else:
+            # Equal weighting would violate the constraint, but that's okay with regularized constraint
+            # because it allows setting some assets to 0%
+            max_active_assets = int(1.0 // min_weight)
+            remaining_weight = 1.0 - max_active_assets * min_weight
+            
+            if verbose:
+                print(f"  Equal weighting ({equal_weight:.3%}) < minimum ({min_weight:.1%})")
+                print(f"  Maximum active assets: {max_active_assets}")
+                print(f"  Remaining weight: {remaining_weight:.1%}")
+                print(f"  Assets that will be set to 0%: {self.n_assets - max_active_assets}")
+                print(f"  ✓ This is feasible with regularized constraint (allows 0% positions)")
+        
+        if verbose:
+            print(f"  ✓ Regularized minimum position constraint is feasible")
 
     def _generate_sector_aware_weights(self, sector_constraints):
         """
@@ -1864,7 +1941,8 @@ class PortfolioOptimizer:
         for constraint_name, constraint_def in constraints.items():
             if isinstance(constraint_def, dict):
                 # Check for min_position constraint type (conditional constraints)
-                if constraint_def.get('type') == 'min_position':
+                constraint_type = constraint_def.get('type')
+                if constraint_type == 'min_position' or constraint_type == 'regularized_min_position':
                     return True
             # Also check for legacy min_position constraint names in lists
             elif isinstance(constraint_def, list):
@@ -1989,7 +2067,9 @@ class PortfolioOptimizer:
                     
                     try:
                         # Add this as a starting point to the study
-                        study._add_manual_trial(variables, mars_objective)
+                        # Note: We can't use the mars_objective here as it's defined in the calling function
+                        # Instead, we'll let MARS handle seeding through its standard mechanisms
+                        pass  # Manual trial seeding would require objective function access
                     except:
                         # If manual trial fails, continue with other starting points
                         pass

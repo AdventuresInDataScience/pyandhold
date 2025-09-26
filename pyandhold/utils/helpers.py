@@ -614,84 +614,338 @@ class Summariser:
             self.portfolio_objects[name] = portfolio
             self.metrics[name] = portfolio.calculate_metrics()
             
-    def show_summary(self, metrics_to_show: List[str] = None):
+    def show_summary(self, 
+                     metrics_to_show: Union[str, List[str]] = 'All',
+                     rolling_windows: Union[int, List[int]] = [60, 126],
+                     show_performance_chart: bool = True,
+                     show_returns_distribution: bool = True,
+                     show_returns_statistics: bool = True,
+                     show_drawdown_chart: bool = True,
+                     show_drawdown_table: bool = True,
+                     show_rolling_metrics: bool = True,
+                     show_correlation_heatmap: bool = True,
+                     show_weights_pie: bool = True,
+                     show_monthly_heatmap: bool = True,
+                     show_period_returns: bool = True,
+                     show_cumulative_returns: bool = True,
+                     show_metrics_summary: bool = True,
+                     show_comparison_table: bool = True,
+                     show_comparison_charts: bool = True,
+                     show_individual_analysis: bool = False):
         """
-        Display a summary comparison of all portfolios.
+        Display a comprehensive summary with all tables, metrics and charts for all portfolios.
         
         Args:
-            metrics_to_show: List of metrics to include in comparison
+            metrics_to_show: 'All' to show everything (default), or list of specific metrics
+            rolling_windows: Single window size or list of window sizes for rolling metrics
+            show_performance_chart: Whether to show portfolio performance line chart
+            show_returns_distribution: Whether to show returns distribution histogram with CDF
+            show_returns_statistics: Whether to show returns statistics table
+            show_drawdown_chart: Whether to show drawdown chart
+            show_drawdown_table: Whether to show top drawdown periods table
+            show_rolling_metrics: Whether to show rolling metrics charts
+            show_correlation_heatmap: Whether to show asset correlation heatmap
+            show_weights_pie: Whether to show portfolio allocation pie chart
+            show_monthly_heatmap: Whether to show monthly returns heatmap table
+            show_period_returns: Whether to show period returns analysis
+            show_cumulative_returns: Whether to show cumulative returns chart
+            show_metrics_summary: Whether to show portfolio metrics summary table
+            show_comparison_table: Whether to show portfolio comparison table (for multiple portfolios)
+            show_comparison_charts: Whether to show portfolio comparison charts (for multiple portfolios)
+            show_individual_analysis: Whether to show individual analysis for each portfolio (for multiple portfolios)
         """
         # Create portfolios if they haven't been created
         if not self.portfolio_objects:
             self._create_portfolios()
             
-        # Define default metrics if not specified
-        if metrics_to_show is None:
-            metrics_to_show = [
-                'total_return', 'cagr', 'volatility', 'sharpe_ratio', 
-                'sortino_ratio', 'max_drawdown', 'calmar_ratio'
-            ]
-            
-        # Create comparison DataFrame
-        comparison_data = []
-        for name, metrics in self.metrics.items():
-            row = {'Portfolio': name}
-            for metric in metrics_to_show:
-                if metric in metrics:
-                    value = metrics[metric]
-                    row[metric] = value
-            comparison_data.append(row)
-            
-        # Convert to DataFrame and display
-        comparison_df = pd.DataFrame(comparison_data)
+        visualizer = PortfolioVisualizer()
         
-        # Format columns appropriately
-        for col in comparison_df.columns:
-            if col == 'Portfolio':
-                continue
-            if 'return' in col.lower() or 'drawdown' in col.lower():
-                comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.2%}")
-            elif 'ratio' in col.lower():
-                comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.3f}")
-            elif 'volatility' in col.lower():
-                comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.2%}")
+        # Ensure rolling_windows is a list
+        if isinstance(rolling_windows, int):
+            rolling_windows = [rolling_windows]
+        
+        # Helper method to generate individual portfolio analysis
+        def _show_individual_portfolio_analysis(name: str, portfolio, metrics: dict, weights: dict):
+            """Show comprehensive analysis for a single portfolio."""
+            print(f"\n{'='*60}")
+            print(f"COMPREHENSIVE PORTFOLIO ANALYSIS: {name}")
+            print(f"{'='*60}")
+            
+            # Calculate portfolio value and returns
+            portfolio_value = portfolio.calculate_portfolio_value()
+            returns = portfolio.portfolio_returns
+            
+            # 1. Performance Line Chart
+            if show_performance_chart:
+                print("\n1. Creating performance line chart...")
+                perf_fig = visualizer.plot_performance(
+                    portfolio_value,
+                    title=f"{name} - Portfolio Performance Over Time"
+                )
+                perf_fig.show()
+            
+            # 2. Returns Distribution Histogram with CDF
+            if show_returns_distribution:
+                print("2. Creating returns distribution...")
+                dist_fig = visualizer.plot_returns_distribution(
+                    returns,
+                    title=f"{name} - Daily Returns Distribution"
+                )
+                dist_fig.show()
+            
+            # 2b. Returns Statistics Table
+            if show_returns_statistics:
+                print("2b. Creating returns statistics table...")
+                stats_df = visualizer.display_returns_statistics(returns)
+                print("Returns Statistics:")
+                display(stats_df)
+            
+            # 3. Drawdown Chart
+            if show_drawdown_chart:
+                print("3. Creating drawdown chart...")
+                dd_fig = visualizer.plot_drawdown(
+                    portfolio_value,
+                    title=f"{name} - Portfolio Drawdown Analysis"
+                )
+                dd_fig.show()
+            
+            # 3b. Top 10 Drawdown Periods Table
+            if show_drawdown_table:
+                print("3b. Creating top 10 drawdown periods table...")
+                top_dd_df = visualizer.display_drawdown_periods(portfolio_value, top_n=10)
+                print("Top 10 Drawdown Periods:")
+                display(top_dd_df)
+            
+            # 4. Rolling Metrics Charts for each window
+            if show_rolling_metrics:
+                for i, window in enumerate(rolling_windows):
+                    print(f"4{chr(97+i)}. Creating {window}-day rolling metrics charts...")
+                    
+                    if returns is not None and len(returns) > window:
+                        print(f"  Returns data shape: {returns.shape}")
+                        
+                        # Rolling Returns
+                        print(f"  Creating {window}-day rolling returns chart...")
+                        rolling_returns = returns.rolling(window).mean()
+                        returns_fig = visualizer.plot_single_metric_timeseries(
+                            rolling_returns * 100,
+                            title=f"{name} - {window}-Day Rolling Mean Return",
+                            y_label="Rolling Returns (%)",
+                            color='blue',
+                            show_mean=True
+                        )
+                        returns_fig.show()
+                        
+                        # Rolling Volatility
+                        print(f"  Creating {window}-day rolling volatility chart...")
+                        rolling_volatility = returns.rolling(window).std()
+                        volatility_fig = visualizer.plot_single_metric_timeseries(
+                            rolling_volatility * 100,
+                            title=f"{name} - {window}-Day Rolling Volatility",
+                            y_label="Rolling Volatility (%)",
+                            color='red',
+                            show_mean=True
+                        )
+                        volatility_fig.show()
+                        
+                        # Rolling Sharpe Ratio
+                        print(f"  Creating {window}-day rolling Sharpe ratio chart...")
+                        rolling_mean = returns.rolling(window).mean()
+                        rolling_std = returns.rolling(window).std()
+                        rolling_sharpe = rolling_mean / rolling_std * np.sqrt(252)
+                        sharpe_fig = visualizer.plot_single_metric_timeseries(
+                            rolling_sharpe,
+                            title=f"{name} - {window}-Day Rolling Sharpe Ratio",
+                            y_label="Rolling Sharpe Ratio",
+                            color='green',
+                            show_mean=True
+                        )
+                        sharpe_fig.show()
+                        
+                        # Rolling Max Drawdown (for longer windows)
+                        if window >= 126:
+                            print(f"  Creating {window}-day rolling max drawdown chart...")
+                            def rolling_max_drawdown(series, window):
+                                def max_drawdown(x):
+                                    if len(x) < 2:
+                                        return 0
+                                    cumulative = (1 + x).cumprod()
+                                    running_max = cumulative.expanding().max()
+                                    drawdown = (cumulative - running_max) / running_max
+                                    return drawdown.min()
+                                return series.rolling(window).apply(max_drawdown)
+                            
+                            rolling_max_dd = rolling_max_drawdown(returns, window)
+                            max_dd_fig = visualizer.plot_single_metric_timeseries(
+                                rolling_max_dd * 100,
+                                title=f"{name} - {window}-Day Rolling Maximum Drawdown",
+                                y_label="Rolling Max Drawdown (%)",
+                                color='orange',
+                                show_mean=True
+                            )
+                            max_dd_fig.show()
+                            
+                            # Rolling Sortino Ratio
+                            print(f"  Creating {window}-day rolling Sortino ratio chart...")
+                            def rolling_sortino(series, window, risk_free_rate=0):
+                                def sortino_ratio(x):
+                                    if len(x) < 2:
+                                        return np.nan
+                                    excess_returns = x - risk_free_rate/252
+                                    downside_returns = excess_returns[excess_returns < 0]
+                                    if len(downside_returns) == 0:
+                                        return np.nan
+                                    downside_deviation = np.sqrt(np.mean(downside_returns**2))
+                                    if downside_deviation == 0:
+                                        return np.nan
+                                    return (np.mean(excess_returns) / downside_deviation) * np.sqrt(252)
+                                return series.rolling(window).apply(sortino_ratio)
+                            
+                            rolling_sortino_w = rolling_sortino(returns, window)
+                            sortino_fig = visualizer.plot_single_metric_timeseries(
+                                rolling_sortino_w,
+                                title=f"{name} - {window}-Day Rolling Sortino Ratio",
+                                y_label="Rolling Sortino Ratio",
+                                color='purple',
+                                show_mean=True
+                            )
+                            sortino_fig.show()
+                        
+                        print(f"  ✓ All {window}-day rolling metrics charts created successfully!")
+                    else:
+                        print(f"  ✗ Not enough data for {window}-day rolling metrics")
+            
+            # 5. Correlation Heatmap
+            if show_correlation_heatmap:
+                print("5. Creating correlation heatmap...")
+                corr_matrix = portfolio.get_correlation_matrix()
+                corr_fig = visualizer.plot_correlation_heatmap(
+                    corr_matrix,
+                    title=f"{name} - Asset Correlation Matrix"
+                )
+                corr_fig.show()
+            
+            # 6. Weights Pie Chart
+            if show_weights_pie:
+                print("6. Creating weights pie chart...")
+                pie_fig = visualizer.plot_weights_pie(
+                    weights,
+                    title=f"{name} - Portfolio Allocation"
+                )
+                pie_fig.show()
+            
+            # 6b. Monthly Returns Heatmap Table
+            if show_monthly_heatmap:
+                print("6b. Creating monthly returns heatmap table...")
+                monthly_table_fig = visualizer.plot_monthly_returns_table(
+                    returns,
+                    title=f"{name} - Monthly Returns Heatmap"
+                )
+                monthly_table_fig.show()
+            
+            # 7. Period Returns
+            if show_period_returns:
+                print("7. Creating period returns analysis...")
+                period_fig = visualizer.plot_period_returns(
+                    returns.to_frame(),
+                    title=f"{name} - Returns by Period"
+                )
+                period_fig.update_layout(width=1000, height=800, title_font_size=16)
+                period_fig.show()
+            
+            # 8. Cumulative returns chart
+            if show_cumulative_returns:
+                print("8. Creating cumulative returns chart...")
+                cum_returns_fig = visualizer.plot_cumulative_returns(
+                    returns,
+                    title=f"{name} - Cumulative Returns"
+                )
+                cum_returns_fig.show()
+            
+            # 9. Display metrics summary
+            if show_metrics_summary:
+                print(f"\n9. {name} Portfolio Metrics Summary:")
+                display(pd.DataFrame(metrics.items(), columns=["Metric", "Value"]))
+        
+        # Main logic: Handle single or multiple portfolios
+        if len(self.portfolio_objects) == 1 and not show_individual_analysis:
+            # Single portfolio - show individual analysis by default
+            name, portfolio = list(self.portfolio_objects.items())[0]
+            metrics = self.metrics[name]
+            weights = self.portfolios[name]
+            _show_individual_portfolio_analysis(name, portfolio, metrics, weights)
+            
+        else:
+            # Multiple portfolios or forced individual analysis
+            if show_individual_analysis or len(self.portfolio_objects) == 1:
+                # Show individual analysis for each portfolio
+                for name, portfolio in self.portfolio_objects.items():
+                    metrics = self.metrics[name]
+                    weights = self.portfolios[name]
+                    _show_individual_portfolio_analysis(name, portfolio, metrics, weights)
+            
+            # Show comparison analysis for multiple portfolios
+            if len(self.portfolio_objects) > 1:
+                print(f"\n{'='*60}")
+                print("MULTIPLE PORTFOLIO COMPARISON")
+                print(f"{'='*60}")
                 
-        print("\n=== Portfolio Comparison ===")
-        display(comparison_df)
-        
-        # Generate performance comparison chart
-        self.plot_performance_comparison()
-        
-    def plot_performance_comparison(self):
-        """Plot comparative performance of all portfolios."""
-        if not self.portfolio_objects:
-            self._create_portfolios()
-            
-        portfolio_values = {}
-        for name, portfolio in self.portfolio_objects.items():
-            portfolio_values[name] = portfolio.calculate_portfolio_value()
-            
-        visualizer = PortfolioVisualizer()
-        fig = visualizer.plot_multiple_portfolios_comparison(
-            portfolio_values,
-            chart_type="performance",
-            title="Portfolio Performance Comparison"
-        )
-        fig.show()
-        
-    def plot_drawdown_comparison(self):
-        """Plot comparative drawdowns of all portfolios."""
-        if not self.portfolio_objects:
-            self._create_portfolios()
-            
-        portfolio_values = {}
-        for name, portfolio in self.portfolio_objects.items():
-            portfolio_values[name] = portfolio.calculate_portfolio_value()
-            
-        visualizer = PortfolioVisualizer()
-        fig = visualizer.plot_multiple_portfolios_comparison(
-            portfolio_values,
-            chart_type="drawdown",
-            title="Portfolio Drawdown Comparison"
-        )
-        fig.show()
+                # Comparison Table
+                if show_comparison_table:
+                    # Define metrics to show
+                    if metrics_to_show == 'All':
+                        metrics_to_show = [
+                            'total_return', 'cagr', 'volatility', 'sharpe_ratio', 
+                            'sortino_ratio', 'max_drawdown', 'calmar_ratio',
+                            'skewness', 'kurtosis', 'var_95', 'cvar_95',
+                            'beta', 'alpha', 'information_ratio', 'tracking_error'
+                        ]
+                    
+                    # Create comparison DataFrame
+                    comparison_data = []
+                    for name, metrics in self.metrics.items():
+                        row = {'Portfolio': name}
+                        for metric in metrics_to_show:
+                            if metric in metrics:
+                                row[metric] = metrics[metric]
+                        comparison_data.append(row)
+                        
+                    comparison_df = pd.DataFrame(comparison_data)
+                    
+                    # Format columns appropriately
+                    for col in comparison_df.columns:
+                        if col == 'Portfolio':
+                            continue
+                        if 'return' in col.lower() or 'drawdown' in col.lower():
+                            comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.2%}")
+                        elif 'ratio' in col.lower():
+                            comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.3f}")
+                        elif 'volatility' in col.lower():
+                            comparison_df[col] = comparison_df[col].apply(lambda x: f"{x:.2%}")
+                            
+                    print("\n=== Portfolio Metrics Comparison ===")
+                    display(comparison_df)
+                
+                # Comparison Charts
+                if show_comparison_charts:
+                    # Performance comparison chart
+                    print("\nGenerating performance comparison chart...")
+                    portfolio_values = {}
+                    for name, portfolio in self.portfolio_objects.items():
+                        portfolio_values[name] = portfolio.calculate_portfolio_value()
+                        
+                    fig = visualizer.plot_multiple_portfolios_comparison(
+                        portfolio_values,
+                        chart_type="performance",
+                        title="Portfolio Performance Comparison"
+                    )
+                    fig.show()
+                    
+                    # Drawdown comparison chart
+                    print("Generating drawdown comparison chart...")
+                    fig = visualizer.plot_multiple_portfolios_comparison(
+                        portfolio_values,
+                        chart_type="drawdown",
+                        title="Portfolio Drawdown Comparison"
+                    )
+                    fig.show()

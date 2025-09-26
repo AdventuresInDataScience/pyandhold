@@ -6,13 +6,46 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
 from scipy import stats
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, TYPE_CHECKING
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+if TYPE_CHECKING:
+    from ..portfolio.portfolio import Portfolio
 
 
 class PortfolioVisualizer:
     """Create various portfolio visualizations."""
+    
+    # Comprehensive color palette for all visualizations
+    # Includes 50+ distinct colors that work well for both light and dark backgrounds
+    COLOR_PALETTE = [
+        # Primary vibrant colors
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+        '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+        
+        # Secondary vibrant colors  
+        '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F48FB1',
+        '#CE93D8', '#90CAF9', '#A5D6A7', '#FFCC02', '#BCAAA4',
+        
+        # Tertiary colors
+        '#FFAB91', '#C5E1A5', '#B39DDB', '#80DEEA', '#FFCDD2',
+        '#D1C4E9', '#B2DFDB', '#C8E6C9', '#FFF9C4', '#F8BBD9',
+        
+        # Professional colors
+        '#64B5F6', '#4DB6AC', '#81C784', '#DCE775', '#FFD54F',
+        '#FF8A65', '#F06292', '#BA68C8', '#9575CD', '#7986CB',
+        
+        # Extended palette for large datasets
+        '#26A69A', '#42A5F5', '#66BB6A', '#9CCC65', '#D4E157',
+        '#FFEE58', '#FFCA28', '#FFA726', '#FF7043', '#EC407A',
+        '#AB47BC', '#7E57C2', '#5C6BC0', '#3F51B5', '#2196F3',
+        
+        # Additional colors for maximum coverage
+        '#00BCD4', '#009688', '#4CAF50', '#8BC34A', '#CDDC39',
+        '#FFEB3B', '#FFC107', '#FF9800', '#FF5722', '#E91E63',
+        '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#03A9F4'
+    ]
     
     @staticmethod
     def plot_performance(
@@ -59,8 +92,16 @@ class PortfolioVisualizer:
             yaxis_title="Portfolio Value",
             hovermode='x unified',
             showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            ),
             height=500,
-            width=1000,
+            width=1100,
+            margin=dict(r=120),
             xaxis=dict(
                 rangeselector=dict(
                     buttons=list([
@@ -150,8 +191,16 @@ class PortfolioVisualizer:
         fig.update_layout(
             title=title,
             height=500,
-            width=1000,
-            showlegend=True
+            width=1100,
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            ),
+            margin=dict(r=120)
         )
         
         # Update axis labels
@@ -248,6 +297,7 @@ class PortfolioVisualizer:
             yaxis_title="Drawdown (%)",
             yaxis=dict(tickformat='.1f'),
             hovermode='x unified',
+            showlegend=False,  # Single series doesn't need legend
             height=500,
             width=1000,
             xaxis=dict(
@@ -318,6 +368,7 @@ class PortfolioVisualizer:
             hovermode='x unified',
             height=400,
             width=1000,
+            showlegend=False,  # Single series with optional mean line doesn't need legend
             xaxis=dict(
                 rangeslider=dict(visible=True, thickness=0.05),
                 type="date"
@@ -415,7 +466,16 @@ class PortfolioVisualizer:
             xaxis_title="Volatility (Annual %)",
             yaxis_title="Expected Return (Annual %)",
             hovermode='closest',
-            showlegend=True
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            ),
+            width=800,
+            height=600
         )
         
         return fig
@@ -426,7 +486,7 @@ class PortfolioVisualizer:
         title: str = "Portfolio Weights"
     ) -> go.Figure:
         """
-        Plot portfolio weights as pie chart with modern pastel colors.
+        Plot portfolio weights as pie chart with comprehensive color palette.
         
         Args:
             weights: Dictionary of weights
@@ -435,19 +495,16 @@ class PortfolioVisualizer:
         Returns:
             Plotly figure
         """
-        # Modern pastel color palette
-        pastel_colors = [
-            '#FF9999', '#66B2FF', '#99FF99', '#FFCC99', 
-            '#FF99CC', '#99CCFF', '#FFB366', '#B3B3FF',
-            '#99FFB3', '#FFD700', '#FF6B9D', '#87CEEB'
-        ]
+        # Use comprehensive color palette
+        colors = [PortfolioVisualizer.COLOR_PALETTE[i % len(PortfolioVisualizer.COLOR_PALETTE)] 
+                 for i in range(len(weights))]
         
         fig = go.Figure(data=[go.Pie(
             labels=list(weights.keys()),
             values=list(weights.values()),
             hole=0.3,
             marker=dict(
-                colors=pastel_colors[:len(weights)],
+                colors=colors,
                 line=dict(color='#FFFFFF', width=2)
             ),
             textinfo='label+percent',
@@ -465,7 +522,9 @@ class PortfolioVisualizer:
                 y=0.5,
                 xanchor="left",
                 x=1.05
-            )
+            ),
+            width=800,
+            height=600
         )
         
         return fig
@@ -476,7 +535,7 @@ class PortfolioVisualizer:
         title: str = "Period Returns Analysis"
     ) -> go.Figure:
         """
-        Plot returns by different periods with modern pastel colors.
+        Plot returns by different periods with comprehensive color palette.
         
         Args:
             returns: DataFrame of returns
@@ -491,8 +550,8 @@ class PortfolioVisualizer:
         monthly_returns = returns.resample('M').apply(lambda x: (1 + x).prod() - 1)
         yearly_returns = returns.resample('Y').apply(lambda x: (1 + x).prod() - 1)
         
-        # Modern pastel color palette
-        pastel_colors = ['#FFB3B3', '#B3D9FF', '#B3FFB3', '#FFE6B3']
+        # Use comprehensive color palette
+        colors = [PortfolioVisualizer.COLOR_PALETTE[i] for i in range(4)]
         
         fig = make_subplots(
             rows=2, cols=2,
@@ -505,7 +564,7 @@ class PortfolioVisualizer:
                 x=daily_returns.index[-50:],  # Show last 50 days to avoid clutter
                 y=daily_returns.iloc[-50:, 0] * 100,  # Convert to percentage
                 name='Daily',
-                marker_color=pastel_colors[0]
+                marker_color=colors[0]
             ),
             row=1, col=1
         )
@@ -516,7 +575,7 @@ class PortfolioVisualizer:
                 x=weekly_returns.index,
                 y=weekly_returns.iloc[:, 0] * 100,
                 name='Weekly',
-                marker_color=pastel_colors[1]
+                marker_color=colors[1]
             ),
             row=1, col=2
         )
@@ -527,7 +586,7 @@ class PortfolioVisualizer:
                 x=monthly_returns.index,
                 y=monthly_returns.iloc[:, 0] * 100,
                 name='Monthly',
-                marker_color=pastel_colors[2]
+                marker_color=colors[2]
             ),
             row=2, col=1
         )
@@ -539,7 +598,7 @@ class PortfolioVisualizer:
                     x=yearly_returns.index,
                     y=yearly_returns.iloc[:, 0] * 100,
                     name='Yearly',
-                    marker_color=pastel_colors[3]
+                    marker_color=colors[3]
                 ),
                 row=2, col=2
             )
@@ -553,7 +612,8 @@ class PortfolioVisualizer:
         fig.update_layout(
             title=title,
             height=800,
-            showlegend=False
+            showlegend=False,
+            margin=dict(l=60, r=60, t=80, b=60)
         )
         
         return fig
@@ -612,7 +672,12 @@ class PortfolioVisualizer:
             xaxis_title="Month",
             yaxis_title="Year",
             width=1000,
-            height=600
+            height=600,
+            yaxis=dict(
+                tickmode='array',
+                tickvals=list(pivot_table.index),
+                ticktext=[str(int(year)) for year in pivot_table.index]
+            )
         )
         
         return fig
@@ -748,6 +813,7 @@ class PortfolioVisualizer:
             width=1000,
             height=500,
             title_font_size=16,
+            showlegend=False,  # Single series doesn't need legend
             xaxis=dict(
                 rangeselector=dict(
                     buttons=list([
@@ -785,8 +851,9 @@ class PortfolioVisualizer:
         """
         fig = go.Figure()
         
-        # Color palette for different portfolios
-        colors = ['blue', 'red', 'green', 'purple', 'orange', 'brown', 'pink', 'gray']
+        # Use comprehensive color palette
+        colors = [PortfolioVisualizer.COLOR_PALETTE[i % len(PortfolioVisualizer.COLOR_PALETTE)] 
+                 for i in range(len(portfolio_values))]
         
         for i, (name, values) in enumerate(portfolio_values.items()):
             if values is None or len(values) == 0:
@@ -817,7 +884,7 @@ class PortfolioVisualizer:
                 y=y_data,
                 mode='lines',
                 name=name,
-                line=dict(color=colors[i % len(colors)], width=2)
+                line=dict(color=colors[i], width=2)
             ))
         
         # Add date slider and range selector
@@ -826,9 +893,16 @@ class PortfolioVisualizer:
             xaxis_title="Date",
             yaxis_title=y_label,
             hovermode='x unified',
-            legend=dict(x=0.02, y=0.98),
-            width=1000,
+            legend=dict(
+                orientation="v",
+                yanchor="top", 
+                y=1,
+                xanchor="left",
+                x=1.02
+            ),
+            width=1100,
             height=600,
+            margin=dict(r=120),
             xaxis=dict(
                 rangeselector=dict(
                     buttons=list([
@@ -867,7 +941,10 @@ class PortfolioVisualizer:
             Plotly figure
         """
         fig = go.Figure()
-        colors = ['blue', 'red', 'green', 'purple', 'orange', 'brown', 'pink', 'gray']
+        
+        # Use comprehensive color palette
+        colors = [PortfolioVisualizer.COLOR_PALETTE[i % len(PortfolioVisualizer.COLOR_PALETTE)] 
+                 for i in range(len(portfolios))]
         
         for i, (name, portfolio) in enumerate(portfolios.items()):
             if portfolio.portfolio_returns is None:
@@ -906,7 +983,7 @@ class PortfolioVisualizer:
                 y=rolling_metric.values,
                 mode='lines',
                 name=name,
-                line=dict(color=colors[i % len(colors)], width=2)
+                line=dict(color=colors[i], width=2)
             ))
         
         fig.update_layout(
@@ -914,8 +991,16 @@ class PortfolioVisualizer:
             xaxis_title="Date",
             yaxis_title=y_label,
             hovermode='x unified',
-            width=1000,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            ),
+            width=1100,
             height=600,
+            margin=dict(r=120),
             xaxis=dict(
                 rangeselector=dict(
                     buttons=list([
