@@ -137,6 +137,64 @@ class DataDownloader:
         """
         return self.download_data(tickers, start_date, end_date, return_both=True, **kwargs)
     
+    def download_with_flexible_alignment(
+        self,
+        tickers: List[str],
+        start_date: Union[str, datetime],
+        end_date: Union[str, datetime] = None,
+        align_all: bool = False,
+        min_history: Optional[int] = None,
+        **kwargs
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Download data with flexible alignment options to preserve maximum history.
+        
+        This method is designed for workflows where you want to:
+        1. Download data for a large universe of assets
+        2. Optimize/select a subset 
+        3. Then align data only for the selected subset
+        
+        Args:
+            tickers: List of ticker symbols
+            start_date: Start date for data
+            end_date: End date for data
+            align_all: If True, align all assets to common date range (traditional approach)
+                      If False, keep individual asset histories intact (recommended)
+            min_history: Minimum history per asset (assets with less history will be dropped)
+            **kwargs: Additional arguments for download_data
+            
+        Returns:
+            Tuple of (prices DataFrame, returns DataFrame)
+            - If align_all=False: Assets may have different start dates (preserves maximum history)
+            - If align_all=True: All assets aligned to common date range (traditional approach)
+        """
+        from .preprocessor import DataPreprocessor
+        
+        # Download raw data
+        prices, returns = self.download_data(tickers, start_date, end_date, return_both=True, **kwargs)
+        
+        if not align_all:
+            # Preserve individual asset histories - only remove assets with insufficient history
+            if min_history:
+                valid_assets = []
+                for col in prices.columns:
+                    asset_data = prices[col].dropna()
+                    if len(asset_data) >= min_history:
+                        valid_assets.append(col)
+                
+                if len(valid_assets) < len(prices.columns):
+                    print(f"Removing {len(prices.columns) - len(valid_assets)} assets with insufficient history (<{min_history} observations)")
+                    prices = prices[valid_assets]
+                    returns = returns[valid_assets]
+            
+            # Don't align - preserve maximum history for each asset
+            return prices, returns
+        else:
+            # Traditional approach - align all to common date range
+            aligned_prices = DataPreprocessor.align_data(prices, min_history=min_history)
+            aligned_returns = DataPreprocessor.align_data(returns, min_history=min_history)
+            return aligned_prices, aligned_returns
+    
     def get_benchmark_data(
         self,
         benchmark: str = "^GSPC",

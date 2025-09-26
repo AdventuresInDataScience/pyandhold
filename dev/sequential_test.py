@@ -2054,7 +2054,7 @@ def setup_summariser_with_constraints():
     
     prices, returns = downloader.download_prices_and_returns(
         tickers=test_tickers,
-        start_date='2020-01-01',
+        start_date='2000-01-01',
         end_date='2023-12-31'
     )
     print(f"✓ Data downloaded: {returns.shape[0]} periods, {returns.shape[1]} assets")
@@ -2191,8 +2191,8 @@ def setup_summariser_with_constraints():
     print("\n4. Setting up Summariser with all portfolios...")
     # Initialize Summariser with date range and parameters
     summariser = Summariser(
-        start_date='2020-01-01',
-        end_date='2023-12-31',
+        start_date='2000-01-01',
+        end_date='2025-12-31',
         initial_capital=100000
     )
     
@@ -2215,7 +2215,9 @@ def test_complete_analysis(summariser):
     summariser.show_summary(
         show_individual_analysis=True,  # Show individual analysis for each portfolio
         show_comparison_table=True,     # Show comparison table
-        show_comparison_charts=True     # Show comparison charts
+        show_comparison_charts=True,    # Show comparison charts
+        show_weights_pie=True,          # Ensure pie charts are shown
+        show_monthly_heatmap=True       # Ensure monthly heatmaps are shown
     )
 
 
@@ -2231,6 +2233,7 @@ def test_performance_focused(summariser):
         show_metrics_summary=True,
         show_comparison_table=True,
         show_comparison_charts=True,
+        show_weights_pie=True,          # Enable pie charts for composition view
         # Turn off other visualizations
         show_returns_distribution=False,
         show_returns_statistics=False,
@@ -2238,7 +2241,6 @@ def test_performance_focused(summariser):
         show_drawdown_table=False,
         show_rolling_metrics=False,
         show_correlation_heatmap=False,
-        show_weights_pie=False,
         show_monthly_heatmap=False,
         show_individual_analysis=True
     )
@@ -2258,12 +2260,12 @@ def test_risk_focused(summariser):
         show_correlation_heatmap=True,
         show_metrics_summary=True,
         show_comparison_table=True,
+        show_monthly_heatmap=True,      # Enable heatmaps for risk pattern analysis
         # Turn off performance charts
         show_performance_chart=False,
         show_cumulative_returns=False,
         show_period_returns=False,
         show_weights_pie=False,
-        show_monthly_heatmap=False,
         show_comparison_charts=False,
         show_individual_analysis=True,
         rolling_windows=[60, 126, 252]  # Extended rolling windows for risk analysis
@@ -2304,13 +2306,13 @@ def test_rolling_metrics_deep_dive(summariser):
         show_rolling_metrics=True,
         show_performance_chart=True,
         show_metrics_summary=True,
+        show_weights_pie=True,          # Show composition for context
         # Turn off everything else
         show_returns_distribution=False,
         show_returns_statistics=False,
         show_drawdown_chart=False,
         show_drawdown_table=False,
         show_correlation_heatmap=False,
-        show_weights_pie=False,
         show_monthly_heatmap=False,
         show_period_returns=False,
         show_cumulative_returns=False,
@@ -2371,18 +2373,47 @@ def test_custom_metrics_focus(summariser):
         show_comparison_table=True,
         show_performance_chart=True,
         show_drawdown_chart=True,
+        show_weights_pie=True,          # Enable pie charts
+        show_cumulative_returns=True,
+        show_comparison_charts=True,
+        show_individual_analysis=True,
+        show_monthly_heatmap=True,      # Enable heatmaps
         # Moderate visualization set
         show_returns_distribution=False,
         show_returns_statistics=False,
         show_drawdown_table=False,
         show_rolling_metrics=False,
         show_correlation_heatmap=False,
-        show_weights_pie=True,
-        show_monthly_heatmap=False,
+        show_period_returns=False
+    )
+
+
+def test_visualization_showcase(summariser):
+    """Test I: Visualization Showcase (Focus on Pie Charts and Heatmaps)"""
+    print("\n" + "-"*50)
+    print("TEST I: Visualization Showcase (Focus on Pie Charts and Heatmaps)")
+    print("-"*50)
+    summariser.show_summary(
+        # PRIMARY FOCUS: Pie charts and heatmaps
+        show_weights_pie=True,          # ✓ Asset allocation pie charts
+        show_monthly_heatmap=True,      # ✓ Monthly returns heatmaps  
+        show_correlation_heatmap=True,  # ✓ Asset correlation heatmaps
+        
+        # Supporting visualizations
+        show_performance_chart=True,
+        show_metrics_summary=True,
+        show_comparison_table=True,
+        show_individual_analysis=True,
+        
+        # Disable other charts to focus on pie charts and heatmaps
+        show_returns_distribution=False,
+        show_returns_statistics=False,
+        show_drawdown_chart=False,
+        show_drawdown_table=False,
+        show_rolling_metrics=False,
         show_period_returns=False,
-        show_cumulative_returns=True,
-        show_comparison_charts=True,
-        show_individual_analysis=True
+        show_cumulative_returns=False,
+        show_comparison_charts=False
     )
 
 
@@ -2404,10 +2435,11 @@ def run_all_summariser_tests():
     test_comparison_only(summariser)
     test_quick_summary(summariser)
     test_custom_metrics_focus(summariser)
+    test_visualization_showcase(summariser)  # NEW: Focus on pie charts and heatmaps
     
     print("\n" + "="*60)
     print("COMPREHENSIVE VISUALIZATION TESTING COMPLETED SUCCESSFULLY!")
-    print("All 8 test scenarios executed:")
+    print("All 9 test scenarios executed:")
     print("  ✓ A: Complete Analysis (All Visualizations)")
     print("  ✓ B: Performance-Focused Analysis") 
     print("  ✓ C: Risk-Focused Analysis")
@@ -2416,6 +2448,7 @@ def run_all_summariser_tests():
     print("  ✓ F: Comparison-Only Analysis")
     print("  ✓ G: Quick Summary (Minimal)")
     print("  ✓ H: Custom Metrics Focus")
+    print("  ✓ I: Visualization Showcase (Pie Charts & Heatmaps)")
     print("="*60)
     
     return summariser, portfolio_weights
@@ -2435,7 +2468,8 @@ def run_specific_summariser_test(test_name):
         'rolling': test_rolling_metrics_deep_dive,
         'comparison': test_comparison_only,
         'quick': test_quick_summary,
-        'custom': test_custom_metrics_focus
+        'custom': test_custom_metrics_focus,
+        'visualization': test_visualization_showcase  # NEW TEST
     }
     
     if test_name.lower() in test_functions:
@@ -2449,19 +2483,39 @@ def run_specific_summariser_test(test_name):
 
 # Usage examples:
 
-# 2. Run all tests (new way)
-# test_result = run_all_summariser_tests()
+# VISUALIZATION SUMMARY:
+# ====================
+# Tests that INCLUDE Pie Charts (Asset Allocation):
+# - test_complete_analysis: ✓ Pie Charts + ✓ Heatmaps (ALL visualizations)
+# - test_performance_focused: ✓ Pie Charts (performance + composition)
+# - test_composition_analysis: ✓ Pie Charts + ✓ Heatmaps (composition focus)
+# - test_rolling_metrics_deep_dive: ✓ Pie Charts (for context)
+# - test_custom_metrics_focus: ✓ Pie Charts + ✓ Heatmaps (custom metrics)
+# - test_visualization_showcase: ✓ Pie Charts + ✓ Heatmaps (FOCUSED ON THESE)
+#
+# Tests that INCLUDE Monthly Returns Heatmaps:
+# - test_complete_analysis: ✓ Pie Charts + ✓ Heatmaps (ALL visualizations)
+# - test_risk_focused: ✓ Heatmaps (risk patterns over time)
+# - test_composition_analysis: ✓ Pie Charts + ✓ Heatmaps (composition focus)
+# - test_custom_metrics_focus: ✓ Pie Charts + ✓ Heatmaps (custom metrics)
+# - test_visualization_showcase: ✓ Pie Charts + ✓ Heatmaps (FOCUSED ON THESE)
 
-# 3. Run specific test only
-test_result = run_specific_summariser_test('performance')  # Only run performance-focused test
-# test_result = run_specific_summariser_test('risk')         # Only run risk-focused test
-# test_result = run_specific_summariser_test('quick')        # Only run quick summary test
+# 1. Run all tests (new way) - NOW INCLUDES PIE CHARTS AND HEATMAPS
+test_result = run_all_summariser_tests()
 
-# 4. Run multiple specific tests
+# 2. Run specific test only
+# test_result = run_specific_summariser_test('complete')       # Complete analysis with pie charts and heatmaps
+# test_result = run_specific_summariser_test('performance')    # Performance-focused (with pie charts)
+# test_result = run_specific_summariser_test('risk')          # Risk-focused (with heatmaps)
+# test_result = run_specific_summariser_test('composition')    # Portfolio composition (pie charts + heatmaps) 
+# test_result = run_specific_summariser_test('visualization')  # NEW: Showcase pie charts and heatmaps specifically
+# test_result = run_specific_summariser_test('custom')        # Custom metrics (with both visualizations)
+
+# 3. Run multiple specific tests
 # summariser, portfolio_weights = setup_summariser_with_constraints()
-# test_performance_focused(summariser)
-# test_risk_focused(summariser)
-# test_quick_summary(summariser)
+# test_composition_analysis(summariser)      # Best for seeing asset allocation pie charts
+# test_visualization_showcase(summariser)    # Best for seeing both pie charts and heatmaps
+# test_complete_analysis(summariser)         # All visualizations including pie charts and heatmaps
 
 # Default: Run all tests for demonstration
 # test_result = run_all_summariser_tests()
