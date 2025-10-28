@@ -75,7 +75,6 @@ for ticker, weight in weights_sharpe.items():
 
 #%% ### Example 3: Robust Optimization with Cross-Validation
 
-```python
 from pyandhold import DataDownloader, RobustOptimizer
 
 # Download data
@@ -107,11 +106,10 @@ shrinkage_weights = robust_opt.shrinkage_covariance_optimize(
     optimization_method='sharpe',
     shrinkage_factor=0.2
 )
-```
 
+#%% ### Example 4: Advanced Backtesting
 ### Example 4: Advanced Backtesting
 
-```python
 from pyandhold import DataDownloader, Backtester
 
 # Download data
@@ -171,11 +169,9 @@ dynamic_results = backtester.backtest_dynamic_strategy(
     rebalance_frequency='M',
     lookback=20
 )
-```
-
+#%% ### Example 5: Using Pre-defined Universes
 ### Example 5: Using Pre-defined Universes
 
-```python
 from pyandhold import StockUniverse, Portfolio, PortfolioOptimizer
 
 # Get sector ETFs
@@ -202,11 +198,9 @@ portfolio = Portfolio(
 )
 
 metrics = portfolio.calculate_metrics()
-```
-
+#%% ### Example 6: Monte Carlo Simulation
 ### Example 6: Monte Carlo Simulation
 
-```python
 from pyandhold import DataDownloader, PortfolioHelpers
 
 # Download data
@@ -230,11 +224,10 @@ simulation_results = PortfolioHelpers.monte_carlo_simulation(
 print(f"Expected 1-year return: {simulation_results['mean'].iloc[-1] - 1:.2%}")
 print(f"5th percentile: {simulation_results['percentile_5'].iloc[-1] - 1:.2%}")
 print(f"95th percentile: {simulation_results['percentile_95'].iloc[-1] - 1:.2%}")
-```
 
+#%% ### Example 7: Efficient Frontier Visualization
 ### Example 7: Efficient Frontier Visualization
 
-```python
 from pyandhold import DataDownloader, PortfolioOptimizer
 from pyandhold.visualization import PortfolioVisualizer
 
@@ -256,8 +249,8 @@ frontier = optimizer.efficient_frontier(
 visualizer = PortfolioVisualizer()
 fig = visualizer.plot_efficient_frontier(frontier)
 fig.show()
-```
 
+#%%
 ## 🎯 Interactive Dashboard
 
 Launch the Streamlit dashboard for a full GUI experience:

@@ -44,7 +44,8 @@ def example_single_portfolio_all_visualizations():
         'HD': 0.10,
         'MA': 0.05,
         'V': 0.05,
-        'META': 0.10
+        'META': 0.10,
+        'NVDA': 0.00
     }
     
     portfolio = Portfolio(
@@ -277,7 +278,7 @@ def example_single_portfolio_all_visualizations():
         title="Monthly Returns Heatmap"
     )
     monthly_table_fig.show()
-    
+
     # 7. Period Returns (Daily, Weekly, Monthly, Yearly)
     print("7. Creating period returns analysis...")
     period_fig = visualizer.plot_period_returns(

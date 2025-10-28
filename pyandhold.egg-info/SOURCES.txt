@@ -1,10 +1,10 @@
 README.md
+pyproject.toml
 setup.py
 pyandhold/__init__.py
 pyandhold.egg-info/PKG-INFO
 pyandhold.egg-info/SOURCES.txt
 pyandhold.egg-info/dependency_links.txt
-pyandhold.egg-info/requires.txt
 pyandhold.egg-info/top_level.txt
 pyandhold/data/__init__.py
 pyandhold/data/downloader.py
